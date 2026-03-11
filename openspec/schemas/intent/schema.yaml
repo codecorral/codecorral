@@ -74,13 +74,15 @@ artifacts:
     requires:
       - intent-brief
   - id: units
-    generates: units.md
+    generates: "units/**/*.md"
     description: Decomposition of the intent into independently deliverable units with per-unit briefs
-    template: units.md
+    template: units/unit-brief.md
     instruction: |
       You are decomposing the intent into independently deliverable units.
 
       **Input:** The completed requirements and system-context artifacts.
+
+      **Output:** Create one `units/<unit-name>/unit-brief.md` file per unit (like specs creates one spec per capability).
 
       **Your job:**
       1. Identify the natural decomposition boundaries based on:
@@ -89,22 +91,21 @@ artifacts:
          - Dependency minimization (units should be as independent as possible)
          - Deliverability (each unit should produce a testable, deployable increment)
 
-      2. For each unit, document in units.md:
-         - **Name**: Short, descriptive identifier (kebab-case)
+      2. For each unit, create `units/<unit-name>/unit-brief.md` containing:
+         - **Name**: Short, descriptive identifier (kebab-case, used as folder name)
          - **Description**: 2-3 sentences explaining what this unit delivers
          - **Deliverable**: What concrete artifact or capability this unit produces
          - **Dependencies**: Which other units (if any) must be completed first
+         - **Relevant Requirements**: Extracted from the requirements artifact
+         - **System Context**: Relevant context from the system-context artifact
+         - **Scope Boundaries**: What is in and out of scope for this unit specifically
 
-      3. For each unit, ALSO create a file at `units/<unit-name>/unit-brief.md` containing:
-         - A description sufficient to seed a Loop 2 spec-driven proposal
-         - Relevant requirements extracted from the requirements artifact
-         - Relevant system context extracted from the system-context artifact
-         - Clear scope boundaries for this unit specifically
+      Each unit-brief must contain enough context to seed a Loop 2 spec-driven proposal
+      without re-reading inception artifacts.
 
       **Quality criteria:**
       - Units should be independently deliverable where possible
       - Each unit should be small enough for one spec-driven change in Loop 2
-      - Unit briefs must contain enough context to start elaboration without re-reading inception artifacts
       - Minimize inter-unit dependencies; prefer parallel-capable units
     requires:
       - requirements
