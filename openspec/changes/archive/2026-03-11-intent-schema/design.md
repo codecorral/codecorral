@@ -50,13 +50,13 @@ artifacts:
 
 **Alternative considered:** Extending the schema format with custom fields (e.g., `mob-config`, `bead-labels`). Rejected — keep the schema standard. Bead integration is a separate concern (CC-3).
 
-### D2: Units artifact is a single file; unit briefs are a side-effect
+### D2: Units artifact uses glob pattern like specs
 
-The `units` artifact generates `units.md` — a single file listing all identified units with descriptions, deliverables, and dependencies. The generation instruction directs the AI to also create `units/<unit-name>/unit-brief.md` files as a side-effect.
+The `units` artifact uses `generates: "units/**/*.md"` with `template: units/unit-brief.md` — matching the convention used by `specs` in the spec-driven schema. Each unit produces a `units/<unit-name>/unit-brief.md` file as the primary output.
 
-This keeps the schema simple (`generates: units.md`) while still producing the per-unit briefs needed to seed Loop 2 changes.
+This aligns with how OpenSpec tracks artifact completion via generated file existence and keeps the units convention consistent with specs.
 
-**Alternative considered:** `generates: "units/**/*.md"` glob pattern like specs uses. Rejected — the units artifact's primary output is the overview/index. The briefs are secondary outputs that support the next loop, not the primary artifact for dependency tracking.
+**Alternative considered:** `generates: units.md` as a single index file with unit briefs as side-effect files. Rejected — inconsistent with the specs pattern and makes status tracking less reliable since side-effect files aren't declared in `generates`.
 
 ### D3: Bolt-plan is the apply gate
 
@@ -82,9 +82,5 @@ The requirements artifact uses user stories, use cases, and boundaries — not f
 The system-context artifact positions the intent within the system landscape using C4 concepts: system context boundary, adjacent systems, and impact analysis. This gives the units artifact enough architectural grounding to identify meaningful decomposition boundaries.
 
 ## Risks / Trade-offs
-
-**[Units as single file may not scale]** For intents with many units (10+), a single `units.md` could get long. Mitigation: the file is an index with brief entries; detail lives in unit briefs. Can revisit if this becomes a problem.
-
-**[Side-effect file creation is unconventional]** The units artifact instruction asks the AI to create files beyond what `generates` declares. Mitigation: OpenSpec doesn't enforce that `generates` is exhaustive — it's used for status tracking. The instruction is free to direct additional file creation.
 
 **[Bolt-plan may be premature for some intents]** Simple intents with one unit don't need wave planning. Mitigation: the bolt-plan can be minimal ("Wave 1: U1, no dependencies"). The artifact is still useful as the dispatch trigger.

@@ -117,7 +117,7 @@ artifacts:
     instruction: |
       You are creating the execution plan that bridges inception to Loop 2 elaboration.
 
-      **Input:** The completed units artifact (units.md and unit briefs).
+      **Input:** The completed unit briefs (`units/<unit-name>/unit-brief.md` files).
 
       **Your job:**
       1. Organize units into dependency waves:

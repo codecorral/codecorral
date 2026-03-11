@@ -1,5 +1,8 @@
-## ADDED Requirements
+# intent-schema Specification
 
+## Purpose
+TBD - created by archiving change intent-schema. Update Purpose after archive.
+## Requirements
 ### Requirement: Intent schema definition
 The intent schema SHALL be a valid OpenSpec custom schema at `openspec/schemas/intent/schema.yaml` defining five artifacts: `intent-brief`, `requirements`, `system-context`, `units`, and `bolt-plan`.
 
@@ -90,7 +93,7 @@ Each of the five artifacts SHALL have a corresponding template file in `openspec
 
 #### Scenario: Template files exist
 - **WHEN** the intent schema is installed
-- **THEN** template files SHALL exist at `templates/intent-brief.md`, `templates/requirements.md`, `templates/system-context.md`, `templates/units.md`, and `templates/bolt-plan.md`
+- **THEN** template files SHALL exist at `templates/intent-brief.md`, `templates/requirements.md`, `templates/system-context.md`, `templates/units/unit-brief.md`, and `templates/bolt-plan.md`
 
 ### Requirement: Each artifact has generation instructions
 Each artifact definition in `schema.yaml` SHALL include an `instruction` field with guidance for AI-assisted first-draft generation, describing what the artifact should contain, how to derive it from its dependencies, and quality criteria.
@@ -98,3 +101,4 @@ Each artifact definition in `schema.yaml` SHALL include an `instruction` field w
 #### Scenario: Instructions guide generation
 - **WHEN** `openspec instructions <artifact-id> --change <name>` is run for an intent schema change
 - **THEN** the returned instruction SHALL describe the artifact's purpose, input sources, and output expectations
+
