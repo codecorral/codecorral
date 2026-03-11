@@ -1,0 +1,148 @@
+name: intent
+version: 1
+description: AI-DLC inception workflow - intent to units
+artifacts:
+  - id: intent-brief
+    generates: intent-brief.md
+    description: Normalized structured brief expanding the raw intent into five consistent sections
+    template: intent-brief.md
+    instruction: |
+      You are generating an intent-brief that normalizes a raw human intent into a structured format.
+
+      **Input:** The human's raw intent — this may be a single sentence, a few bullet points, or a detailed document.
+
+      **Your job:**
+      - If the input is sparse: expand it by inferring reasonable scope, stakeholders, and constraints from project context. Fill every section with meaningful content.
+      - If the input is verbose: distill it into the five-section format, preserving all stated requirements but removing redundancy and organizing consistently.
+      - NEVER invent requirements that are not stated or clearly implied by the input and project context.
+
+      **Output:** A markdown document with exactly these five sections:
+      1. **Problem Statement** — What problem or opportunity does this intent address?
+      2. **Desired Outcome** — What does success look like when this intent is fully realized?
+      3. **Scope** — What is in scope and explicitly out of scope?
+      4. **Stakeholders** — Who is affected by or involved in this intent?
+      5. **Constraints** — Known technical, timeline, resource, or policy constraints.
+
+      The output must be consistent regardless of input detail level. A one-line intent and a ten-page document should both produce the same structured five-section brief.
+    requires: []
+  - id: requirements
+    generates: requirements.md
+    description: Lightweight user stories, use cases, NFRs, and scope boundaries
+    template: requirements.md
+    instruction: |
+      You are generating lightweight inception-level requirements from the intent-brief.
+
+      **Input:** The completed intent-brief.
+
+      **Your job:**
+      - Derive user stories that capture the key behaviors this intent enables
+      - Identify use cases that illustrate how the system will be used
+      - Note non-functional requirements (performance, security, reliability, etc.) that are relevant at the intent level
+      - Define clear boundaries — what is explicitly out of scope
+
+      **Quality criteria:**
+      - Keep it lightweight: use simple "As a... I want... So that..." format for stories
+      - Use cases should be narrative, not formal UML-style
+      - NFRs should be directional, not precise targets (those come in Loop 2)
+      - Boundaries must be explicit and unambiguous
+      - Do NOT use formal SHALL/scenario format — that's for spec-driven artifacts in Loop 2
+    requires:
+      - intent-brief
+  - id: system-context
+    generates: system-context.md
+    description: C4-framed system landscape positioning and impact analysis
+    template: system-context.md
+    instruction: |
+      You are generating a system-context artifact that positions the intent within the broader system landscape.
+
+      **Input:** The completed intent-brief.
+
+      **Your job:**
+      - Describe the system landscape: what systems exist today that are relevant to this intent
+      - Define the context boundary: what is inside vs outside the system being changed
+      - Identify adjacent systems: what other systems interact with or are affected by this intent
+      - Analyze impact: how does this intent change the current architecture, data flows, or integration points
+      - Note the technical landscape: relevant technology choices, platform constraints, and infrastructure context
+
+      **Framing:** Use C4 model concepts (System Context level) to structure your analysis. You are positioning this intent in the system map, not designing internals.
+
+      **Quality criteria:**
+      - Focus on boundaries and relationships, not implementation details
+      - Identify integration points that will need attention during unit decomposition
+      - Be specific about which existing systems are touched
+      - Flag any architectural risks or tensions this intent introduces
+    requires:
+      - intent-brief
+  - id: units
+    generates: units.md
+    description: Decomposition of the intent into independently deliverable units with per-unit briefs
+    template: units.md
+    instruction: |
+      You are decomposing the intent into independently deliverable units.
+
+      **Input:** The completed requirements and system-context artifacts.
+
+      **Your job:**
+      1. Identify the natural decomposition boundaries based on:
+         - Functional cohesion (features that belong together)
+         - System boundaries (from system-context)
+         - Dependency minimization (units should be as independent as possible)
+         - Deliverability (each unit should produce a testable, deployable increment)
+
+      2. For each unit, document in units.md:
+         - **Name**: Short, descriptive identifier (kebab-case)
+         - **Description**: 2-3 sentences explaining what this unit delivers
+         - **Deliverable**: What concrete artifact or capability this unit produces
+         - **Dependencies**: Which other units (if any) must be completed first
+
+      3. For each unit, ALSO create a file at `units/<unit-name>/unit-brief.md` containing:
+         - A description sufficient to seed a Loop 2 spec-driven proposal
+         - Relevant requirements extracted from the requirements artifact
+         - Relevant system context extracted from the system-context artifact
+         - Clear scope boundaries for this unit specifically
+
+      **Quality criteria:**
+      - Units should be independently deliverable where possible
+      - Each unit should be small enough for one spec-driven change in Loop 2
+      - Unit briefs must contain enough context to start elaboration without re-reading inception artifacts
+      - Minimize inter-unit dependencies; prefer parallel-capable units
+    requires:
+      - requirements
+      - system-context
+  - id: bolt-plan
+    generates: bolt-plan.md
+    description: Wave-based execution plan organizing units for Loop 2 dispatch
+    template: bolt-plan.md
+    instruction: |
+      You are creating the execution plan that bridges inception to Loop 2 elaboration.
+
+      **Input:** The completed units artifact (units.md and unit briefs).
+
+      **Your job:**
+      1. Organize units into dependency waves:
+         - Wave 1: Units with no inter-unit dependencies (can start immediately)
+         - Wave 2: Units that depend on Wave 1 units
+         - Wave N: Continue until all units are placed
+
+      2. For each unit in the plan, specify:
+         - **Unit name**
+         - **Wave number**
+         - **Priority** within the wave (P1 = highest)
+         - **Dependencies** (which units must complete first)
+         - **Estimated complexity** (S/M/L — for team sizing hints)
+
+      3. Document bead creation notes:
+         - Each unit becomes one elaboration bead in Loop 2
+         - Note the bead label pattern and any metadata needed
+         - Reference the unit-brief path for each bead's input
+
+      **Quality criteria:**
+      - Waves should maximize parallelism
+      - Priority should reflect business value and risk (build risky things first)
+      - The plan should be actionable — someone reading it should know exactly what to dispatch and in what order
+      - Simple intents with one unit should still have a valid (minimal) bolt-plan
+    requires:
+      - units
+apply:
+  requires:
+    - bolt-plan
