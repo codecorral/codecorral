@@ -6,8 +6,8 @@
 
 ## 2. Home Manager Module
 
-- [ ] 2.1 Create `nix/hm-module.nix` with module option `services.openspec.enable` (bool, default false)
-- [ ] 2.2 Add option `services.openspec.schemas` (list of strings, default all available schemas)
+- [ ] 2.1 Create `nix/hm-module.nix` with module option `programs.openspec.enable` (bool, default false), `programs.openspec.schemas` (list of strings), `programs.openspec.schemaPackage` (derivation), and `meta.maintainers`
+- [ ] 2.2 Default `programs.openspec.schemas` to all available schemas in the package
 - [ ] 2.3 Implement `xdg.dataFile` entries that symlink selected schemas from the package to `openspec/schemas/<name>`
 - [ ] 2.4 Export the module as `homeManagerModules.openspec` in `flake.nix`
 

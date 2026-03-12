@@ -36,8 +36,13 @@ The flake exports:
 
 Consumers add the flake as an input and import the module. The module references the package internally.
 
-**D4: Module option for selective schema installation**
-The module exposes `services.openspec.schemas` (list of schema names). Default: all schemas in the package. This allows consumers to install only what they need.
+**D4: Use `programs.openspec` namespace following Home Manager conventions**
+Home Manager convention: `programs.<name>` for user programs, `services.<name>` for daemons. OpenSpec is a program, not a service. The module follows standard HM patterns:
+- `programs.openspec.enable` — bool, default false
+- `programs.openspec.schemas` — list of schema names to install, default all
+- `programs.openspec.schemaPackage` — the schema package derivation (default: the one from this flake)
+- `meta.maintainers` — module maintainer list
+- Alternative considered: `services.openspec` — rejected because openspec is not a daemon/service; HM convention reserves `services.*` for long-running processes
 
 ## Risks / Trade-offs
 

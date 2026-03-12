@@ -20,7 +20,7 @@ The Home Manager module SHALL allow users to select which schemas to install, de
 - **THEN** all schemas in the package SHALL be installed
 
 #### Scenario: Selective schema installation
-- **WHEN** a user sets `services.openspec.schemas = ["intent"]`
+- **WHEN** a user sets `programs.openspec.schemas = ["intent"]`
 - **THEN** only the `intent` schema SHALL be installed
 
 ### Requirement: Project-local schemas take precedence
