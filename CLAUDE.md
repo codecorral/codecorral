@@ -19,14 +19,23 @@ CodeCorral is the orchestration layer for AI-DLC (AI-Driven Development Lifecycl
 - [openmob](https://github.com/codecorral/openmob) — Mob elaboration ceremonies
 - [shuffle](https://github.com/codecorral/shuffle) — Agent-deck configuration
 
+## Commands
+```bash
+nix build .#openspec-schemas   # Build schema package
+nix flake check                # Validate flake
+```
+
 ## Project Structure
 ```
 codecorral/
-  openspec/          # OpenSpec change management
+  openspec/
     changes/         # Active change proposals
+    schemas/         # JSON schemas (e.g. dev.codecorral.intent)
     specs/           # Main specifications
-  .ralph-tui/        # Ralph-TUI configuration (future)
-  .claude/agents/    # Agent persona files (future)
+    config.yaml      # OpenSpec configuration
+  nix/
+    hm-module.nix    # Home Manager module for schema distribution
+  flake.nix          # Nix flake — builds & distributes schemas
 ```
 
 ## Development Guidelines
@@ -34,3 +43,4 @@ codecorral/
 - Design decisions are numbered (D1, D2, ...) for traceability
 - Bead taxonomy follows AI-DLC conventions
 - Construction beads use worktree isolation: `wt/construction-{intent}-{unit}-{task-id}`
+- Schemas are distributed as a Nix package via `flake.nix` + Home Manager module

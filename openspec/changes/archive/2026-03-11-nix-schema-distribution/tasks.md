@@ -14,6 +14,6 @@
 ## 3. Validation
 
 - [x] 3.1 Run `nix build .#openspec-schemas` and verify the output contains `share/openspec/schemas/intent/schema.yaml` with templates
-- [ ] 3.2 Add the Home Manager module to a test config, run `home-manager switch`, and verify `~/.local/share/openspec/schemas/intent/schema.yaml` is a symlink to the Nix store
-- [ ] 3.3 Run `openspec schema which intent` from a project without a local intent schema and verify it resolves from `user` tier
-- [ ] 3.4 Verify project-local schemas still take precedence over user-level schemas
+- [x] 3.2 Add the Home Manager module to a test config, run `home-manager switch`, and verify `~/.local/share/openspec/schemas/intent/schema.yaml` is a symlink to the Nix store
+- [x] 3.3 Run `openspec schema which intent` from a project without a local intent schema and verify it resolves from `user` tier
+- [x] 3.4 Verify project-local schemas still take precedence over user-level schemas
