@@ -130,10 +130,14 @@ Captured from tuicr review sessions against `domain-model.md`. Each item needs a
 - `.codecorral/config.yaml` — project overrides
 - Merge with project taking precedence for project-specific settings
 
-### D21: Runtime composition of state machines
+### D21: Composition of state machines
 **Source:** Review #23
-**Question:** Can users compose/extend state machines at runtime? XState machines are JavaScript, so overrides would need to be JS too. This may be too complex for v1.
-**Leaning:** v1 supports definition selection (pick which machine) and config overrides (guard thresholds, timeouts). Runtime composition (adding states/transitions) deferred to v2.
+**Question:** Can users compose/extend state machines?
+**XState v5 constraints:**
+- Machine structure (states, transitions) is **frozen** after `setup().createMachine()`. No runtime structural changes.
+- **Implementation overrides** (different action/guard/actor implementations) are supported at actor creation via `.provide()`. This covers guard thresholds, timeouts, and behavioral swaps without changing machine structure.
+- **Structural composition** (adding states/transitions) must happen at **build time** — merging configuration objects before calling `setup().createMachine()`.
+**Leaning:** v1 supports definition selection (pick which machine) and `.provide()` overrides (guard thresholds, timeouts, custom action implementations). Build-time structural composition (merging state configs) deferred to v2.
 
 ### D22: Schema-to-definition relationship (many-to-one)
 **Source:** Review #24
