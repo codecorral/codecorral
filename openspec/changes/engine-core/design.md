@@ -31,9 +31,13 @@ Key reference documents informing this design:
 
 ## Decisions
 
-### ED1: TypeScript monorepo with single entry point
+### ED1: TypeScript monorepo with single entry point and client-only commands
 
-The engine is a single TypeScript package producing one binary: `codecorral`. The binary serves as both CLI client and daemon process. When invoked as a CLI command (e.g., `codecorral status`), it connects to the daemon via Unix socket. When no daemon is running, the CLI auto-starts one in the background.
+The engine is a single TypeScript package producing one binary: `codecorral`. The binary serves as both CLI client and daemon process.
+
+**Client-only commands:** Commands that only read persisted state (`codecorral status`, `codecorral history`, `codecorral workspaces`) work **without the daemon running**. They read directly from `~/.codecorral/instances/*.json` and `~/.codecorral/config.yaml`. This follows the pattern of tools like `git status` and `docker ps` — basic inspection commands should never fail because a server isn't running.
+
+**Daemon-required commands:** Commands that modify state (`codecorral transition`, MCP tool calls) require the daemon. If the daemon isn't running, these commands auto-start it transparently. The user never sees "starting daemon..." messages — the command just works, slightly slower the first time.
 
 **Why not separate packages?** One binary simplifies installation (npm, Nix) and version alignment. The client/daemon split is internal — both share type definitions and the JSON-RPC protocol.
 
@@ -68,9 +72,45 @@ Workflow definitions are registered by ID (e.g., `test-v0.1`). The registry is a
 
 Definition precedence (D19): CLI-embedded defaults → project-level (`.codecorral/definitions/`) → user-level (`~/.codecorral/definitions/`). Engine-core implements the registry and the CLI-embedded tier only. File-based overrides are loaded if present but not required.
 
-### ED7: Config file format and loading
+### ED7: Config file format, Nix module delegation, and loading
 
-`~/.codecorral/config.yaml` is the primary configuration file. Structure:
+`~/.codecorral/config.yaml` is the primary configuration file for CodeCorral-specific settings (workspaces, workflow assignments). However, the CodeCorral HM module does **not** reimplement configuration for agent-deck, Claude Code, or OpenSpec. It **delegates** to their upstream Nix modules:
+
+| Concern | Upstream Module | What CodeCorral's module does |
+|---|---|---|
+| Agent-deck profiles, MCPs, conductor | `programs.agent-deck` ([nix-agent-deck](https://github.com/agentplot/nix-agent-deck)) | Sets `programs.agent-deck.profiles.<name>.claude.configDir` and conductor config per workspace |
+| Claude Code settings, agents, hooks, skills, MCP servers | `programs.claude-code` ([agentplot-kit](https://github.com/agentplot/agentplot-kit)) | Sets `programs.claude-code.profiles.<name>` with workspace-specific settings, agents, hooks |
+| OpenSpec schema installation | `programs.openspec` (this repo's `nix/hm-module.nix`) | Sets `programs.openspec.schemas` list for the workspace |
+
+The CodeCorral workspace config translates declarative workspace definitions into options on these upstream modules. It does not generate `config.toml`, `settings.json`, or schema symlinks directly — that's the upstream modules' job.
+
+```nix
+# What the user writes:
+codecorral.workspaces.my-project = {
+  path = "/path/to/project";
+  workflows = [ "intent" "unit" ];
+  agentDeck.profile = "my-project";
+  claudeCode.profile = {
+    model = "claude-sonnet-4-6";
+  };
+  openspec.schemas = [
+    "dev.codecorral.intent@2026-03-11.0"
+  ];
+};
+
+# What the CodeCorral module generates (delegating to upstream):
+programs.agent-deck.profiles.my-project.claude.configDir = ".claude-my-project";
+programs.claude-code.profiles.my-project = {
+  configDir = ".claude-my-project";
+  settings = { /* workspace-specific settings */ };
+};
+programs.openspec = {
+  enable = true;
+  schemas = [ "dev.codecorral.intent@2026-03-11.0" ];
+};
+```
+
+CodeCorral's own `~/.codecorral/config.yaml` contains only CodeCorral-specific state: workspace definitions, workflow assignments, and engine settings. It does not duplicate agent-deck, Claude Code, or OpenSpec configuration.
 
 ```yaml
 workspaces:
@@ -79,16 +119,8 @@ workspaces:
     workflows:
       - intent
       - unit
-    agentDeck:
-      profile: my-project
-    claudeCode:
-      model: claude-sonnet-4-6
-    openspec:
-      schemas:
-        - dev.codecorral.intent@2026-03-11.0
-      schemasPath: ./openspec/schemas
-      config:
-        defaultSchema: dev.codecorral.unit@1.0
+    agentDeckProfile: my-project
+    claudeCodeProfile: my-project
 ```
 
 The HM module generates this file. Non-Nix users write it manually. The engine reads it at startup and exposes it via `codecorral workspaces`.

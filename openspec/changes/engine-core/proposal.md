@@ -8,12 +8,12 @@ CodeCorral has no runtime engine. Workflow state is inferred from scattered arti
 - Implement snapshot persistence: subscribe to each actor, atomically write `~/.codecorral/instances/<id>.json` on every state change, rehydrate on restart
 - Expose MCP server with `workflow.transition`, `workflow.status`, `workflow.context`, and `workflow.setBrowserUrl` tools (contract C6)
 - Implement CLI commands: `codecorral status [id]`, `codecorral history <id>`, `codecorral transition <event> --instance <id> [--payload '{}']`, `codecorral workspaces`
-- Implement implicit daemon lifecycle: auto-start on first CLI/MCP use, socket-based discovery (`~/.codecorral/daemon.sock`), graceful shutdown with state persistence (contract C8)
+- Implement implicit daemon lifecycle: auto-start on first mutating CLI/MCP use, socket-based discovery (`~/.codecorral/daemon.sock`), graceful shutdown with state persistence (contract C8). Read-only commands (`status`, `history`, `workspaces`) work without the daemon by reading persisted state directly — basic inspection should never fail because a server isn't running
 - Implement event translation layer: external `{ event, payload }` → internal `{ type, ...flatPayload }`
 - Ship `test-v0.1` workflow definition: 4 states (`IDLE → WORKING → REVIEWING → DONE`) with manual transitions only — no sessions, views, or conductor
 - Create npm package structure (`npx codecorral`) for independent CLI installation
-- Create Nix flake with Home Manager module for declarative workspace configuration generating `~/.codecorral/config.yaml`
-- Define config file format (`~/.codecorral/config.yaml`) for workspaces, agent-deck profiles, Claude Code profiles, and OpenSpec schema declarations
+- Create Nix flake with Home Manager module for declarative workspace configuration. The module **delegates** to upstream Nix modules (`programs.agent-deck`, `programs.claude-code`, `programs.openspec`) rather than reimplementing their config generation. CodeCorral's own `~/.codecorral/config.yaml` contains only workspace assignments and engine settings
+- Define config file format (`~/.codecorral/config.yaml`) for workspace-to-workflow mappings and profile references
 
 ## Capabilities
 
@@ -21,9 +21,9 @@ CodeCorral has no runtime engine. Workflow state is inferred from scattered arti
 - `xstate-actor-runtime`: XState v5 actor creation, hosting, mailbox event processing, and snapshot persistence with atomic writes
 - `mcp-server`: MCP server exposing workflow tools (transition, status, context, setBrowserUrl) with event translation layer
 - `cli`: `codecorral` CLI for workflow inspection, control, and workspace enumeration — independently installable via npm and Nix
-- `daemon-lifecycle`: Implicit process management — auto-start, socket discovery, PID file, graceful shutdown, state recovery from persisted snapshots
-- `workspace-config`: Declarative workspace configuration via `~/.codecorral/config.yaml` — agent-deck profiles, Claude Code profiles, OpenSpec schemas per workspace
-- `nix-distribution`: Nix flake + Home Manager module generating config from declarative workspace definitions; npm package for non-Nix users
+- `daemon-lifecycle`: Implicit process management — auto-start on mutating commands, socket discovery, PID file, graceful shutdown, state recovery from persisted snapshots. Read-only commands (`status`, `history`, `workspaces`) work without the daemon
+- `workspace-config`: Declarative workspace configuration via `~/.codecorral/config.yaml` — workspace-to-workflow mappings and profile references (agent-deck and Claude Code profiles are configured via their upstream Nix modules)
+- `nix-distribution`: Nix flake + Home Manager module that delegates to upstream modules (`programs.agent-deck`, `programs.claude-code`, `programs.openspec`) for tool-specific config; npm package for non-Nix users
 - `test-workflow`: `test-v0.1` hardcoded workflow definition (IDLE → WORKING → REVIEWING → DONE) for validating the engine before production workflows exist
 
 ### Modified Capabilities
