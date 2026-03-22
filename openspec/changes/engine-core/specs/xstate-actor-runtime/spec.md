@@ -22,12 +22,18 @@ The engine SHALL process events sequentially per workflow instance using XState'
 - **WHEN** events are sent to two different workflow instances simultaneously
 - **THEN** both events are processed concurrently without blocking each other
 
-### Requirement: Snapshot persistence on every state change
-The engine SHALL persist the full XState snapshot on every actor state change by subscribing to the actor via `actor.subscribe()`. Persistence SHALL use atomic write (write to temp file, rename to final path) to prevent corruption. Instance files SHALL be written to `~/.codecorral/instances/<id>.json`.
+### Requirement: Snapshot persistence on state change with deduplication
+The engine SHALL persist the full XState snapshot on actor state changes by subscribing to the actor via `actor.subscribe()`. The persistence callback SHALL check referential equality of the snapshot against the previously persisted snapshot (`if (snapshot !== prevSnapshot)`) before writing, to avoid unnecessary I/O on rejected events. Persistence SHALL use atomic write (write to temp file, rename to final path) to prevent corruption. Instance files SHALL be written to `~/.codecorral/instances/<id>.json`.
+
+The instance envelope SHALL include a `schemaVersion` field recording the definition version at creation time (see ED11).
 
 #### Scenario: State change triggers atomic persistence
 - **WHEN** an actor transitions to a new state
-- **THEN** the engine writes the serialized instance (id, definitionId, xstateSnapshot via `actor.getPersistedSnapshot()`, history, timestamps) to `<id>.json.tmp` and atomically renames it to `<id>.json`
+- **THEN** the engine writes the serialized instance (id, definitionId, schemaVersion, xstateSnapshot via `actor.getPersistedSnapshot()`, history, timestamps) to `<id>.json.tmp` and atomically renames it to `<id>.json`
+
+#### Scenario: Rejected event does not trigger persistence
+- **WHEN** an event is sent to an actor but is rejected (no matching transition or guard fails)
+- **THEN** the snapshot is unchanged and no write occurs (referential equality check passes)
 
 #### Scenario: Partial write does not corrupt state
 - **WHEN** the engine process is killed during a snapshot write
@@ -54,6 +60,21 @@ The engine SHALL return a `TransitionResult` after processing each event, indica
 #### Scenario: Rejected transition for unknown event
 - **WHEN** an event is sent that has no matching transition in the current state
 - **THEN** the engine returns `{ accepted: false, newState: null, phase: null, message: "No transition for event '<event>' in state '<current>'" }`
+
+### Requirement: Snapshot versioning and migration hook
+The instance envelope SHALL include a `schemaVersion` field recording the definition version at creation time. On rehydration, the engine SHALL compare `schemaVersion` to the current definition version. If mismatched, the engine SHALL check for a registered migration function. If a migration exists, it SHALL be applied before rehydration. If no migration exists, the engine SHALL log a warning and skip the instance.
+
+#### Scenario: Matching schema version rehydrates normally
+- **WHEN** an instance file has `schemaVersion: "test-v0.1"` and the definition registry has `test-v0.1`
+- **THEN** the instance is rehydrated normally
+
+#### Scenario: Mismatched version with no migration skips instance
+- **WHEN** an instance file has `schemaVersion: "test-v0.1"` but the registry only has `test-v0.2` and no migration is registered
+- **THEN** the engine logs a warning and skips the instance
+
+#### Scenario: Mismatched version with migration applies it
+- **WHEN** an instance file has `schemaVersion: "test-v0.1"`, the registry has `test-v0.2`, and a migration from v0.1→v0.2 is registered
+- **THEN** the migration function transforms the snapshot and the instance is rehydrated with the migrated snapshot
 
 ### Requirement: Definition registry
 The engine SHALL maintain a definition registry (`Map<string, MachineConfig>`) mapping definition IDs to XState machine configurations. Definitions SHALL be loaded at startup from: (1) CLI-embedded defaults, (2) user-level `~/.codecorral/definitions/` overrides, (3) project-level `.codecorral/definitions/` overrides. Highest precedence wins for duplicate IDs.

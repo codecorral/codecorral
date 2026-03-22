@@ -27,7 +27,7 @@ The `test-v0.1` definition SHALL support the following transitions:
 - **THEN** the transition is rejected and the instance remains in `reviewing`
 
 ### Requirement: test-v0.1 context tracking
-The `test-v0.1` definition SHALL maintain context fields: `hasWork` (boolean, set to true on `submit`), `submitCount` (number, incremented on each `submit`), `workStartedAt` (ISO timestamp, set on `start`).
+The `test-v0.1` definition SHALL maintain context fields: `hasWork` (boolean, set to true on `submit`, reset to false on `review.revised`), `submitCount` (number, incremented on each `submit`), `workStartedAt` (ISO timestamp, set on `start`).
 
 #### Scenario: Context updated on start
 - **WHEN** the `start` event is processed
@@ -36,6 +36,10 @@ The `test-v0.1` definition SHALL maintain context fields: `hasWork` (boolean, se
 #### Scenario: Context updated on submit
 - **WHEN** the `submit` event is processed
 - **THEN** `context.hasWork` is set to `true` and `context.submitCount` is incremented by 1
+
+#### Scenario: hasWork reset on revision
+- **WHEN** the `review.revised` event is processed
+- **THEN** `context.hasWork` is set to `false`, requiring a new `submit` before `review.approved` can succeed
 
 #### Scenario: Context survives persistence round-trip
 - **WHEN** an instance is persisted to disk and rehydrated on daemon restart

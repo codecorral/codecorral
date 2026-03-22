@@ -5,21 +5,21 @@ CodeCorral has no runtime engine. Workflow state is inferred from scattered arti
 ## What Changes
 
 - Create a long-lived engine daemon process hosting XState v5 actors with mailbox-based sequential event processing per instance
-- Implement snapshot persistence: subscribe to each actor, atomically write `~/.codecorral/instances/<id>.json` on every state change, rehydrate on restart
-- Expose MCP server with `workflow.transition`, `workflow.status`, `workflow.context`, and `workflow.setBrowserUrl` tools (contract C6)
+- Implement snapshot persistence with deduplication: subscribe to each actor, skip writes when snapshot is unchanged (referential equality), atomically write `~/.codecorral/instances/<id>.json` via tmp+rename, rehydrate on restart with orphaned `.tmp` cleanup and `schemaVersion` migration check
+- Expose MCP server as per-session thin adapters (Agent ↔ stdio ↔ MCP process ↔ Unix socket ↔ Daemon) with `workflow.transition`, `workflow.status`, `workflow.context`, and `workflow.setBrowserUrl` tools (contract C6)
 - Implement CLI commands: `codecorral status [id]`, `codecorral history <id>`, `codecorral transition <event> --instance <id> [--payload '{}']`, `codecorral workspaces`
 - Implement implicit daemon lifecycle: auto-start on first mutating CLI/MCP use, socket-based discovery (`~/.codecorral/daemon.sock`), graceful shutdown with state persistence (contract C8). Read-only commands (`status`, `history`, `workspaces`) work without the daemon by reading persisted state directly — basic inspection should never fail because a server isn't running
 - Implement event translation layer: external `{ event, payload }` → internal `{ type, ...flatPayload }`
 - Ship `test-v0.1` workflow definition: 4 states (`IDLE → WORKING → REVIEWING → DONE`) with manual transitions only — no sessions, views, or conductor
-- Create npm package structure (`npx codecorral`) for independent CLI installation
+- Create npm package (`npm install -g codecorral` for daemon usage; `npx` for one-shot read-only commands with daemon warning)
 - Create Nix flake with Home Manager module for declarative workspace configuration. The module **delegates** to upstream Nix modules (`programs.agent-deck`, `programs.claude-code`, `programs.openspec`) rather than reimplementing their config generation. CodeCorral's own `~/.codecorral/config.yaml` contains only workspace assignments and engine settings
 - Define config file format (`~/.codecorral/config.yaml`) for workspace-to-workflow mappings and profile references
 
 ## Capabilities
 
 ### New Capabilities
-- `xstate-actor-runtime`: XState v5 actor creation, hosting, mailbox event processing, and snapshot persistence with atomic writes
-- `mcp-server`: MCP server exposing workflow tools (transition, status, context, setBrowserUrl) with event translation layer
+- `xstate-actor-runtime`: XState v5 actor creation, hosting, mailbox event processing, snapshot persistence with deduplication and atomic writes, snapshot versioning with migration hook for future definition evolution
+- `mcp-server`: Per-session MCP server processes (stdio→socket adapter) exposing workflow tools (transition, status, context, setBrowserUrl) with event translation layer
 - `cli`: `codecorral` CLI for workflow inspection, control, and workspace enumeration — independently installable via npm and Nix
 - `daemon-lifecycle`: Implicit process management — auto-start on mutating commands, socket discovery, PID file, graceful shutdown, state recovery from persisted snapshots. Read-only commands (`status`, `history`, `workspaces`) work without the daemon
 - `workspace-config`: Declarative workspace configuration via `~/.codecorral/config.yaml` — workspace-to-workflow mappings and profile references (agent-deck and Claude Code profiles are configured via their upstream Nix modules)
@@ -46,4 +46,5 @@ CodeCorral has no runtime engine. Workflow state is inferred from scattered arti
 - XState v5 (state machine runtime)
 - Node.js (engine runtime)
 - MCP SDK (tool server)
+- vscode-jsonrpc (Content-Length framed JSON-RPC over Unix socket)
 - Nix + Home Manager (declarative config path, optional)

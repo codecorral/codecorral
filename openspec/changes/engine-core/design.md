@@ -41,17 +41,25 @@ The engine is a single TypeScript package producing one binary: `codecorral`. Th
 
 **Why not separate packages?** One binary simplifies installation (npm, Nix) and version alignment. The client/daemon split is internal — both share type definitions and the JSON-RPC protocol.
 
-### ED2: JSON-RPC over Unix domain socket
+### ED2: JSON-RPC over Unix domain socket with Content-Length framing
 
-CLI-to-daemon communication uses JSON-RPC 2.0 over `~/.codecorral/daemon.sock`. The MCP server runs as a separate transport (stdio-based, per MCP SDK conventions) that calls into the same actor registry.
+CLI-to-daemon communication uses JSON-RPC 2.0 over `~/.codecorral/daemon.sock`. Messages use **Content-Length header framing** (per the Language Server Protocol wire format) to ensure correct message boundary detection over the byte-stream socket. This is the same framing used by `vscode-jsonrpc`, which is the recommended library.
 
-**Why JSON-RPC?** It's the protocol MCP itself uses, keeps the internal protocol consistent, and is well-supported in Node.js. Unix socket (not TCP) because the daemon is single-machine, and socket file presence doubles as daemon discovery.
+**MCP server architecture:** Each agent session gets its own MCP server process spawned via stdio. The MCP process is a thin adapter that connects to the daemon via the Unix socket:
+
+```
+Agent ↔ stdio ↔ MCP process ↔ Unix socket ↔ Daemon
+```
+
+Stdio is inherently single-client — one agent per MCP process. The daemon is the multiplexer, handling connections from multiple MCP processes and CLI clients concurrently. Each MCP process is stateless and short-lived (tied to the agent session lifecycle).
+
+**Why JSON-RPC?** It's the protocol MCP itself uses, keeps the internal protocol consistent, and is well-supported in Node.js (`vscode-jsonrpc`, 4M+ weekly downloads). Unix socket (not TCP) because the daemon is single-machine, and socket file presence doubles as daemon discovery. Socket path must be under 104 bytes (macOS limit) — `~/.codecorral/daemon.sock` is well within this for typical usernames.
 
 ### ED3: Actor registry pattern
 
 The daemon maintains an in-memory `Map<string, ActorRef>` keyed by instance ID. All operations (transition, status, context) look up the actor by ID. New instances are created by instantiating a machine from the definition registry, subscribing to state changes for persistence, and starting the actor.
 
-On startup, the registry rehydrates from `~/.codecorral/instances/*.json` — each file contains the definition ID and the opaque XState persisted snapshot.
+On startup, the registry rehydrates from `~/.codecorral/instances/*.json` — each file contains the definition ID, a `schemaVersion` field, and the XState persisted snapshot. Orphaned `*.json.tmp` files (from crashes during writes) are deleted during startup before rehydration begins.
 
 ### ED4: Atomic snapshot persistence via tmp+rename
 
@@ -60,7 +68,11 @@ On every actor state change (via `actor.subscribe`), the engine:
 2. Writes to a temp file in the same directory (`<id>.json.tmp`)
 3. Renames atomically to `<id>.json`
 
-This prevents partial writes from corrupting instance state. The subscribe callback is synchronous from XState's perspective — the write is fire-and-forget with error logging.
+This prevents partial writes from corrupting instance state.
+
+**Subscribe deduplication:** XState v5's `actor.subscribe()` fires on every `actor.send()`, not just on state changes — including when events are rejected by guards. The persistence callback checks referential equality of the snapshot (`if (snapshot !== prevSnapshot)`) before writing, avoiding unnecessary I/O on rejected events.
+
+**Client-only read safety:** CLI commands that read instance files directly (without the daemon) may encounter ENOENT if the daemon archives/deletes an instance between `readdir()` and `readFile()`. The CLI silently skips ENOENT errors during reads, treating them as archived instances.
 
 ### ED5: Event translation at the boundary
 
@@ -83,6 +95,14 @@ Definition precedence (D19): CLI-embedded defaults → project-level (`.codecorr
 | OpenSpec schema installation | `programs.openspec` (this repo's `nix/hm-module.nix`) | Sets `programs.openspec.schemas` list for the workspace |
 
 The CodeCorral workspace config translates declarative workspace definitions into options on these upstream modules. It does not generate `config.toml`, `settings.json`, or schema symlinks directly — that's the upstream modules' job.
+
+**Module guard:** The module uses `programs.codecorral.enable` as its activation guard, consistent with the existing `programs.openspec` module. All config generation and upstream delegation is wrapped in `lib.mkIf cfg.enable`.
+
+**Upstream module imports:** Delegation to upstream modules is guarded with `lib.mkIf` checks (e.g., `lib.mkIf config.programs.agent-deck.enable`) so that CodeCorral does not produce "undefined option" errors if an upstream module is not imported. If an upstream module is not available, the CodeCorral module skips that delegation and logs a warning at `home-manager switch` time via `lib.warn`.
+
+**Schema installation is global (union of all workspaces):** `programs.openspec.schemas` receives the union of all workspace schema lists. Schema isolation between workspaces is not supported in v1 — all schemas from all workspaces are visible globally via `~/.local/share/openspec/schemas/`. Project-local `schemasPath` takes precedence when both global and local provide the same schema (resolved by OpenSpec's existing resolution order: project > user > package).
+
+**No duplicate profile assertion:** The module asserts (`lib.assertMsg`) that no two workspaces map to the same agent-deck or Claude Code profile name, preventing silent config merging.
 
 ```nix
 # What the user writes:
@@ -140,7 +160,8 @@ IDLE → (start) → WORKING → (submit) → REVIEWING → (approve) → DONE
 States: `idle`, `working`, `reviewing`, `done` (final).
 Events: `start`, `submit`, `review.approved`, `review.revised`.
 Guards: `review.approved` requires `context.hasWork === true` (sync guard only).
-Actions: `assign` context fields on transitions (workStartedAt, submitCount, etc.).
+Actions: `assign` context fields on transitions. Critically, `review.revised` resets `context.hasWork = false` so the guard actually blocks re-approval without new work. This exercises the "guard blocks transition" scenario meaningfully — not just on the first submit.
+Context fields: `hasWork` (boolean), `submitCount` (number), `workStartedAt` (ISO timestamp).
 No invoked services, no sessions, no views, no conductor.
 
 ### ED9: Instance ID generation
@@ -150,6 +171,27 @@ Instance IDs use the format `{definitionId}-{shortId}` where `shortId` is a rand
 ### ED10: Event history in instance file
 
 Each instance file includes a `history` array of processed events with timestamps. This is the source for `codecorral history <id>`. History is append-only within the instance file — written alongside each snapshot update. The history array is bounded (configurable, default 1000 entries) with oldest entries dropped.
+
+### ED11: Snapshot versioning for definition migration
+
+XState persisted snapshots are **not portable across machine definition changes**. Renaming a state, restructuring context, or changing invocations breaks rehydration. The instance envelope includes a `schemaVersion` field that records the definition version at creation time.
+
+On rehydration, the engine compares the persisted `schemaVersion` to the current definition version. If mismatched:
+1. Check the definition registry for a registered migration function (`migrations.get(fromVersion, toVersion)`)
+2. If a migration exists, run it and rehydrate with the migrated snapshot
+3. If no migration exists, log a warning and skip the instance (do not silently corrupt it)
+
+For `test-v0.1`, no migrations exist — this is infrastructure for Units 4-7 when production definitions evolve. The `schemaVersion` field and migration hook are implemented now so the instance file format doesn't need to change later.
+
+### ED12: Instance lifecycle and cleanup
+
+Completed instances (in a final state like `done`) are **excluded from rehydration** — the daemon does not create actors for them. They remain on disk for `codecorral status` and `codecorral history` (read from file, not from actor). A `codecorral gc [--older-than 30d]` command removes completed instances older than a threshold. No automatic cleanup in v1 — users run `gc` manually or via cron.
+
+### ED13: npm installation and daemon lifecycle
+
+`npx codecorral` is suitable for one-shot read-only commands (`status`, `workspaces`) but is **not recommended for daemon usage**. The npx cache key changes on version updates, which can orphan a running daemon. The recommended npm path is `npm install -g codecorral`.
+
+When the CLI auto-starts a daemon, it resolves its own binary path to an absolute path and records it in the PID file. This ensures the daemon process is identifiable regardless of how the CLI was invoked. The CLI warns if it detects it's running via npx and attempts to auto-start a daemon.
 
 ## Risks / Trade-offs
 

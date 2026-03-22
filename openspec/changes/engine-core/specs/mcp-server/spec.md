@@ -51,9 +51,21 @@ The engine SHALL inject `WFE_INSTANCE_ID` as an environment variable when creati
 - **WHEN** both `WFE_INSTANCE_ID` and an explicit `instanceId` parameter are provided
 - **THEN** the explicit parameter takes precedence
 
-### Requirement: MCP transport via stdio
-The MCP server SHALL use stdio transport per MCP SDK conventions. The engine daemon SHALL spawn the MCP server as needed for agent connections. The MCP server SHALL communicate with the actor registry over the daemon's internal API.
+### Requirement: MCP transport via stdio with per-session process
+The MCP server SHALL use stdio transport per MCP SDK conventions. Each agent session SHALL get its own MCP server process — stdio is inherently single-client. The MCP process is a thin adapter that connects to the engine daemon via the Unix socket (`~/.codecorral/daemon.sock`) using JSON-RPC with Content-Length framing.
+
+Architecture: `Agent ↔ stdio ↔ MCP process ↔ Unix socket ↔ Daemon`
+
+The daemon is the multiplexer. Each MCP process is stateless and tied to the agent session lifecycle.
 
 #### Scenario: MCP server starts for agent connection
 - **WHEN** an agent session is configured with the `workflow-engine` MCP server
-- **THEN** the MCP server starts via stdio and exposes all workflow tools
+- **THEN** a new MCP server process starts via stdio, connects to the daemon socket, and exposes all workflow tools
+
+#### Scenario: Multiple agents connect concurrently
+- **WHEN** two agent sessions each have the `workflow-engine` MCP server configured
+- **THEN** two separate MCP server processes are running, each connected to the daemon via independent socket connections
+
+#### Scenario: MCP process auto-starts daemon if needed
+- **WHEN** an MCP process starts and no daemon is running (no socket file)
+- **THEN** the MCP process starts the daemon in the background, waits for the socket, then connects

@@ -38,11 +38,15 @@ The daemon SHALL persist all active workflow instance snapshots before exiting o
 - **THEN** all 3 instance files in `~/.codecorral/instances/` contain up-to-date snapshots
 
 ### Requirement: State recovery from persisted snapshots
-On startup, the daemon SHALL rehydrate all workflow instances from `~/.codecorral/instances/*.json`. Each instance SHALL be restored by creating an XState actor with the persisted snapshot and starting it.
+On startup, the daemon SHALL first delete all orphaned `*.json.tmp` files in `~/.codecorral/instances/` (left by crashes during writes), then rehydrate active workflow instances from `*.json`. Instances in a final state SHALL be excluded from rehydration (no actor is created) — they remain on disk for read-only CLI access.
 
-#### Scenario: Rehydrate instances on startup
-- **WHEN** the daemon starts and `~/.codecorral/instances/` contains 2 instance files
-- **THEN** 2 XState actors are created from their persisted snapshots, subscribed for persistence, and started
+#### Scenario: Orphaned tmp files cleaned on startup
+- **WHEN** the daemon starts and `~/.codecorral/instances/` contains `test.json.tmp`
+- **THEN** the tmp file is deleted before rehydration begins
+
+#### Scenario: Rehydrate active instances on startup
+- **WHEN** the daemon starts and `~/.codecorral/instances/` contains 3 instance files, 2 in active states and 1 in a final state
+- **THEN** 2 XState actors are created from the active instances' persisted snapshots, subscribed for persistence, and started. The completed instance is not rehydrated.
 
 #### Scenario: Skip corrupted instance files
 - **WHEN** an instance file contains invalid JSON
@@ -50,6 +54,10 @@ On startup, the daemon SHALL rehydrate all workflow instances from `~/.codecorra
 
 #### Scenario: Handle unknown definition ID
 - **WHEN** an instance file references a definition ID not in the registry
+- **THEN** the daemon logs a warning, skips the instance, and continues starting
+
+#### Scenario: Handle schema version mismatch
+- **WHEN** an instance file has a `schemaVersion` that differs from the current definition version and no migration is registered
 - **THEN** the daemon logs a warning, skips the instance, and continues starting
 
 ### Requirement: Explicit daemon commands

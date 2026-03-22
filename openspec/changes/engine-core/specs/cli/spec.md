@@ -48,27 +48,46 @@ The CLI SHALL provide `codecorral workspaces` to enumerate all configured worksp
 - **WHEN** the user runs `codecorral workspaces` and `~/.codecorral/config.yaml` does not exist
 - **THEN** the CLI displays "No configuration found. Create ~/.codecorral/config.yaml or use Nix Home Manager module."
 
-### Requirement: CLI connects to daemon automatically
-The CLI SHALL auto-detect and connect to the engine daemon via `~/.codecorral/daemon.sock`. If no daemon is running, the CLI SHALL auto-start one in the background before executing the command.
+### Requirement: Client-only commands read persisted state directly
+Read-only CLI commands (`codecorral status`, `codecorral history`, `codecorral workspaces`) SHALL work without the daemon running by reading instance files and config directly from disk. The CLI SHALL silently skip instance files that return ENOENT during reads, treating them as archived.
+
+#### Scenario: Status without daemon
+- **WHEN** the user runs `codecorral status` and no daemon is running
+- **THEN** the CLI reads `~/.codecorral/instances/*.json` directly and displays instance status
+
+#### Scenario: ENOENT during read
+- **WHEN** the CLI reads instance files and one is deleted between `readdir()` and `readFile()`
+- **THEN** the CLI silently skips the missing file and continues with remaining instances
+
+### Requirement: Daemon auto-start for mutating commands
+Mutating CLI commands (`codecorral transition`) SHALL auto-detect and connect to the engine daemon via `~/.codecorral/daemon.sock`. If no daemon is running, the CLI SHALL auto-start one in the background before executing the command.
 
 #### Scenario: Daemon is running
-- **WHEN** the user runs any CLI command and `~/.codecorral/daemon.sock` exists and is responsive
+- **WHEN** the user runs a mutating CLI command and `~/.codecorral/daemon.sock` exists and is responsive
 - **THEN** the CLI connects to the daemon and executes the command
 
 #### Scenario: Daemon is not running
-- **WHEN** the user runs any CLI command and no daemon socket exists
+- **WHEN** the user runs a mutating CLI command and no daemon socket exists
 - **THEN** the CLI starts the daemon in the background, waits for the socket to become available, then executes the command
 
 #### Scenario: Stale socket file
-- **WHEN** the user runs any CLI command and the socket file exists but connection is refused
+- **WHEN** the user runs a mutating CLI command and the socket file exists but connection is refused
 - **THEN** the CLI removes the stale socket, starts a new daemon, and executes the command
 
 ### Requirement: Independent installation
-The CLI SHALL be independently installable via `npx codecorral` (npm) and `nix profile install` (Nix flake). Both installation methods SHALL produce the same `codecorral` binary with identical behavior.
+The CLI SHALL be independently installable via npm and Nix. The recommended npm path for daemon usage is `npm install -g codecorral`. `npx codecorral` is suitable for one-shot read-only commands but SHALL warn if it attempts to auto-start a daemon (npx cache invalidation can orphan daemons).
 
-#### Scenario: Install via npm
-- **WHEN** the user runs `npx codecorral status`
+#### Scenario: Install via npm global
+- **WHEN** the user runs `npm install -g codecorral` followed by `codecorral status`
 - **THEN** the CLI executes successfully without requiring Nix or any other CodeCorral component
+
+#### Scenario: npx with read-only command
+- **WHEN** the user runs `npx codecorral status`
+- **THEN** the CLI executes successfully by reading persisted state directly (no daemon needed)
+
+#### Scenario: npx with daemon-requiring command warns
+- **WHEN** the user runs `npx codecorral transition start --instance test --definition test-v0.1`
+- **THEN** the CLI warns "Running via npx — daemon may not persist across npx cache updates. Consider `npm install -g codecorral` for daemon usage." and proceeds
 
 #### Scenario: Install via Nix
 - **WHEN** the user runs `nix profile install .#codecorral` followed by `codecorral status`
