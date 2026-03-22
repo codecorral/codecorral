@@ -129,9 +129,9 @@ export function sendEvent(
     entry.history.splice(0, entry.history.length - MAX_HISTORY);
   }
 
-  // Re-persist with updated history if accepted (snapshot changed triggers persist)
-  // For rejected events, we still want history recorded
-  if (!accepted) {
+  // Re-persist with updated history — subscribe callback fires before history
+  // is appended, so we always re-persist to include the latest history entry
+  {
     const instance: PersistedWorkflowInstance = {
       id: instanceId,
       definitionId: entry.definitionId,

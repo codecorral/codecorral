@@ -146,6 +146,22 @@ in
       }
     );
 
+    # Delegate to upstream claude-code module if available
+    programs.claude-code = lib.mkIf (config ? programs && config.programs ? claude-code) (
+      let
+        claudeConfigs = lib.filterAttrs (_: ws: ws.claudeCode.model != null)
+          cfg.workspaces;
+      in
+      {
+        profiles = lib.mapAttrs (name: ws: {
+          configDir = ".claude-${name}";
+          settings = lib.optionalAttrs (ws.claudeCode.model != null) {
+            model = ws.claudeCode.model;
+          };
+        }) claudeConfigs;
+      }
+    );
+
     # Delegate to upstream openspec module if available
     programs.openspec = lib.mkIf (config ? programs && config.programs ? openspec) {
       enable = true;

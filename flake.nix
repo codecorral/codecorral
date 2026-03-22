@@ -37,6 +37,15 @@
             chmod +x $out/bin/codecorral
           '';
         };
+
+        checks = {
+          openspec-schemas = self.packages.${system}.openspec-schemas;
+          codecorral-hm-module = pkgs.runCommand "check-codecorral-hm-module" { } ''
+            # Validate that the HM module file parses as valid Nix
+            ${pkgs.nix}/bin/nix-instantiate --parse ${./nix/codecorral-hm-module.nix} > /dev/null
+            touch $out
+          '';
+        };
       }
     ) // {
       homeManagerModules.openspec = import ./nix/hm-module.nix self;
