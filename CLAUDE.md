@@ -1,26 +1,34 @@
 # CodeCorral
 
 ## Project Overview
-CodeCorral is the orchestration layer for AI-DLC (AI-Driven Development Lifecycle). It implements a three-loop architecture (inception, bolt elaboration, construction) that coordinates agent teams, manages bead-driven task execution, and provides human review gates.
+CodeCorral is the workflow engine for AI-DLC (AI-Driven Development Lifecycle). It uses XState-based state machines to drive two composable workflow definitions — intent and unit — through structured development phases with human review gates. The engine coordinates agent teams via agent-deck, manages change artifacts via OpenSpec, and runs mob elaboration ceremonies via OpenMob.
 
 ## Architecture
-- **Conductor** — Central orchestration script that routes intents, creates beads, and manages loop transitions
-- **Three-loop lifecycle:**
-  - Loop 1 (Inception): Pool model via AgentDeck, one bead per intent
-  - Loop 2 (Bolt Elaboration): Ralph `--print` mode, one bead per unit
-  - Loop 3 (Construction): Ralph `--parallel` mode with worktrees, many beads per unit
-- **Intent routing** maps complexity signals (trivial/simple/moderate/complex/architectural) to team sizing and execution strategy
+- **Workflow Engine** — XState daemon that owns workflow definitions, state machines, transitions, guards, and actions
+- **Conductor** — LLM bridge (one per profile) that polls the task board, delegates work to agent-deck sessions, and routes human approvals back into the engine
+- **Two-workflow composition:**
+  - **Intent workflow** (`dev.codecorral.intent`): Raw idea → elaboration → unit decomposition → publishes unit briefs to task board
+  - **Unit workflow** (`dev.codecorral.unit`): Consumes unit briefs → elaboration → implementation → code review → verification
+- **Task board** as anti-corruption layer between intent and unit workflows
+- **Human review gates** — Explicit XState states where workflows pause for human approval
 
 ## Key Dependencies
-- [openspec](https://github.com/madswan-dev/openspec) — Change management
-- [ralph-tui](https://github.com/madswan-dev/ralph-tui) — Autonomous loop execution
-- [agent-deck](https://github.com/asheshgoplani/agent-deck) — Session management
-- [beads-rust](https://github.com/madswan-dev/beads-rust) — Task tracking
-- [openmob](https://github.com/codecorral/openmob) — Mob elaboration ceremonies
-- [shuffle](https://github.com/codecorral/shuffle) — Agent-deck configuration
+- [openspec](https://github.com/madswan-dev/openspec) — Artifact-driven change management
+- [agent-deck](https://github.com/asheshgoplani/agent-deck) — Session management for agent teams
+- [openmob](https://github.com/codecorral/openmob) — Mob elaboration ceremony framework
+- [shuffle](https://github.com/codecorral/shuffle) — Declarative agent-deck profile configuration
+
+## Tech Stack
+- **Runtime:** Bun
+- **State machines:** XState v5
+- **CLI:** Commander
+- **MCP:** Model Context Protocol SDK
+- **Distribution:** Nix flake + Home Manager module
 
 ## Commands
 ```bash
+bun test                       # Run tests
+bun run typecheck              # Type check
 nix build .#openspec-schemas   # Build schema package
 nix flake check                # Validate flake
 ```
@@ -28,8 +36,15 @@ nix flake check                # Validate flake
 ## Project Structure
 ```
 codecorral/
+  src/
+    actors/          # XState actor definitions
+    cli/             # CLI entry point (commander)
+    config/          # Workspace and workflow configuration
+    daemon/          # Engine daemon lifecycle
+    mcp/             # MCP server for tool integration
+    persistence/     # XState snapshot persistence
   openspec/
-    changes/         # Active change proposals
+    changes/         # Active and archived change proposals
     schemas/         # JSON schemas (e.g. dev.codecorral.intent)
     specs/           # Main specifications
     config.yaml      # OpenSpec configuration
@@ -41,6 +56,7 @@ codecorral/
 ## Development Guidelines
 - Use OpenSpec for all design changes — proposals before implementation
 - Design decisions are numbered (D1, D2, ...) for traceability
-- Bead taxonomy follows AI-DLC conventions
-- Construction beads use worktree isolation: `wt/construction-{intent}-{unit}-{task-id}`
+- Sessions are conductor children (`--parent conductor-{name}`)
+- Board interaction is the conductor's domain, not the engine's
+- `codecorral pull` delegates to the conductor as single entry point
 - Schemas are distributed as a Nix package via `flake.nix` + Home Manager module
