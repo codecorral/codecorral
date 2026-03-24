@@ -1,31 +1,32 @@
 ## Why
 
-The engine can drive workflow workspaces in cmux, but there is no "home base" — no persistent workspace where the developer sees conductor activity, the tracking board, and high-level workflow status at a glance. When you open cmux today, CodeCorral has no presence until a workflow creates a workspace. The developer needs a command center: a pinned workspace per cmux window that bootstraps the CodeCorral experience, attaches to conductors, and provides an extensible dashboard that grows with the system.
+The engine can drive workflow workspaces in cmux, but there is no "home base" — no persistent workspace where the developer sees conductor activity, the tracking board, and high-level workflow status at a glance. When you open cmux today, CodeCorral has no presence until a workflow creates a workspace. Building the command center also requires a declarative view layout system — and that same system serves workflow phase views, so we build both together. A shared `defineLayout` / `defineOverlay` / `resolveLayout` TypeScript API gives all views the same syntax, makes views customizable by end users, and lets embedded state machines ship default views that users can override without forking.
 
 ## What Changes
 
-- New `codecorral activate` CLI command that bootstraps a command center workspace in cmux
-- Environment detection via `CMUX_WORKSPACE_ID` env var to determine if running inside cmux
-- Idempotent activation: re-running `activate` is a no-op if the command center already exists
-- Command center workspace is pinned to position 0 in the cmux sidebar, never closed by the engine
-- Initial command center layout: conductor terminal pane (attached via `agent-deck session attach`) + tracking board browser pane
-- Declarative layout system for the command center, reusing the same view engine reconciliation mechanism used for workflow workspaces
-- One command center per cmux window (window = project/profile per C2 mapping)
-- Outside cmux: `codecorral activate` prints a message directing the user to run it inside cmux
+- **Unified view layout system** — `defineLayout()` builder for declaring views (panes, panels, workspace metadata), `defineOverlay()` for add/remove/override deltas, `resolveLayout()` for merging base + overlay. TypeScript throughout, dynamic panel lists via context functions.
+- **Pane grouping** — Multiple panels with the same `pane` value become tabs/surfaces within a single split region. Enables N conductors sharing one pane, or a review pane with both a terminal tab and a browser tab.
+- **State machine view integration** — Workflow state machines reference layouts via `state.meta.view`. The view engine reads this on transitions and reconciles. Users override embedded machine views without forking via overlay files.
+- **`codecorral view fork` command** — Scaffolds an overlay file into `.codecorral/views/`. Defaults to empty overlay (user adds deltas); `--full` copies complete base for full ownership.
+- **Command center workspace** — `codecorral activate` bootstraps a pinned workspace per cmux window with conductor terminal pane(s) + tracking board browser pane, using the layout system as its first consumer.
+- **Environment detection** via `CMUX_WORKSPACE_ID` env var + `system.identify()` RPC for window resolution.
+- **Workspace config extension** — `board` URL and `conductors` configuration per workspace.
 
 ## Capabilities
 
 ### New Capabilities
-- `command-center`: The command center workspace lifecycle — activation, layout declaration, environment detection, pinned workspace management, conductor attachment, and tracking board browser pane. Extensible panel system for future high-level views.
+- `view-layout`: The `defineLayout` / `defineOverlay` / `resolveLayout` system — layout declaration, pane grouping, overlay composition, context-driven dynamic panels, state machine integration, overlay file discovery, and the `codecorral view fork` command.
+- `command-center`: The command center workspace lifecycle — activation, environment detection, pinned workspace management, conductor attachment, tracking board browser pane. First consumer of the view layout system.
 
 ### Modified Capabilities
-- `cli`: New `codecorral activate` command with cmux environment detection
-- `workspace-config`: Workspace config gains an optional `board` URL field for the tracking board and conductor configuration per workspace
+- `cli`: New `codecorral activate` and `codecorral view fork` commands
+- `workspace-config`: Workspace config gains optional `board` URL and `conductors` configuration
 
 ## Impact
 
-- `src/cli/` — new `activate` command
-- `src/config/` — workspace config schema extended with `board` and conductor fields
-- View engine (when implemented) — command center layout becomes a first-class view config alongside workflow phase view configs
-- C2 contract — uses existing cmux primitives (createWorkspace, splitSurface, openBrowserSplit, sendText) plus a new `pinned` option on `createWorkspace` (contract extension required)
-- Depends on conductor sessions existing (Unit 3) for the terminal attachment; can scaffold without them initially
+- `src/cmux/` — new `layout-types.ts`, `layout.ts` (builders), `resolve.ts` (resolution), `overlay-loader.ts` (file discovery), `view-bridge.ts` (state machine integration), `env.ts` (cmux detection), `client.ts` (socket RPC), `layouts/command-center.ts` (built-in layout)
+- `src/cli/` — new `activate` and `view` commands
+- `src/config/` — workspace config schema extended with `board` and `conductors` fields
+- View engine (Unit 5) — reconciliation algorithm consumes `resolveLayout` output
+- All workflow state machines — reference layouts via `state.meta.view`
+- C2 contract — requires `createWorkspace` extension for `pinned` and `position` options

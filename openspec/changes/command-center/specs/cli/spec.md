@@ -31,3 +31,22 @@ The CLI SHALL provide `codecorral activate` to bootstrap a command center worksp
 #### Scenario: Activate when already active
 - **WHEN** the user runs `codecorral activate` and a command center already exists for the current window
 - **THEN** the CLI prints the current command center status (workspace name, panel count, conductor status) and exits with code 0
+
+### Requirement: codecorral view fork command
+The CLI SHALL provide `codecorral view fork <layout-name> [--full]` to scaffold a view overlay file into `.codecorral/views/`. By default, the command SHALL create an empty overlay with correct imports and comments showing available roles. With `--full`, it SHALL copy the complete base layout.
+
+#### Scenario: Fork creates overlay scaffold
+- **WHEN** the user runs `codecorral view fork command-center`
+- **THEN** the CLI creates `.codecorral/views/command-center.ts` with an empty `defineOverlay` export and comments listing available panel roles
+
+#### Scenario: Fork with --full copies base
+- **WHEN** the user runs `codecorral view fork command-center --full`
+- **THEN** the CLI creates `.codecorral/views/command-center.ts` with the complete base `defineLayout` content
+
+#### Scenario: Fork for workflow machine
+- **WHEN** the user runs `codecorral view fork unit-workflow`
+- **THEN** the CLI creates `.codecorral/views/unit-workflow.ts` with empty overlays keyed by each state name that has a `meta.view`
+
+#### Scenario: Fork target already exists
+- **WHEN** the user runs `codecorral view fork command-center` and `.codecorral/views/command-center.ts` already exists
+- **THEN** the CLI prints a warning and exits without overwriting

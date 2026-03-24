@@ -1,11 +1,11 @@
 ## ADDED Requirements
 
 ### Requirement: Command center workspace lifecycle
-The engine SHALL support a command center workspace per cmux window. The command center is a pinned workspace at sidebar position 0 that persists for the lifetime of the cmux window. The engine SHALL NOT close the command center during workflow transitions or cleanup.
+The engine SHALL support a command center workspace per cmux window. The command center is a pinned workspace at sidebar position 0 that persists for the lifetime of the cmux window. The engine SHALL NOT close the command center during workflow transitions or cleanup. The command center layout SHALL be defined using `defineLayout` from the view layout system.
 
 #### Scenario: Command center created on activation
 - **WHEN** `codecorral activate` is run inside cmux and no command center exists for the current window
-- **THEN** the engine creates a new cmux workspace pinned at position 0 with the name "Command Center"
+- **THEN** the engine resolves the command center layout via `resolveLayout`, creates a new cmux workspace pinned at position 0 with the name "Command Center", and creates panes and panels per the resolved layout
 
 #### Scenario: Command center survives workflow lifecycle
 - **WHEN** a workflow completes and its workspace is closed
@@ -26,20 +26,31 @@ The engine SHALL detect whether it is running inside cmux by checking for the `C
 - **WHEN** `codecorral activate` is run and `CMUX_WORKSPACE_ID` is not set
 - **THEN** the engine prints a message directing the user to start cmux first, and exits with code 1
 
-### Requirement: Declarative command center layout
-The command center layout SHALL be declared as a structured configuration with a workspace section and an array of panel configurations. Each panel SHALL specify a role (unique identifier), type (`terminal` or `browser`), split position, and type-specific parameters (command for terminals, URL for browsers).
+### Requirement: Command center default layout
+The built-in command center layout SHALL use `defineLayout` with pane grouping. Conductor panels SHALL share a "conductors" pane (appearing as tabs when multiple conductors are configured). The tracking board SHALL occupy a "board" pane. The panel list SHALL be a dynamic function that reads `workspace.conductors` and `workspace.board` from the context.
 
-#### Scenario: Layout with conductor terminal and tracking board
-- **WHEN** the command center is activated for a workspace with `board` URL and `conductor.name` configured
-- **THEN** the command center creates two panels: a terminal panel running `agent-deck session attach {conductor.name}` in the main position, and a browser panel showing the board URL split to the right
+#### Scenario: Layout with multiple conductors and tracking board
+- **WHEN** the command center is activated for a workspace with two conductors and a `board` URL
+- **THEN** the command center creates a "conductors" pane (main region) with two terminal surface tabs (one per conductor running `agent-deck session attach {name}`), and a "board" pane (right region) with a browser surface showing the board URL
 
 #### Scenario: Layout without board URL
 - **WHEN** the command center is activated for a workspace where `board` is not configured
-- **THEN** the command center creates only the conductor terminal panel (no browser panel)
+- **THEN** the command center creates only the conductors pane (no board pane)
 
-#### Scenario: Layout without conductor
-- **WHEN** the command center is activated for a workspace where `conductor.name` is not configured
-- **THEN** the terminal panel opens a shell in the workspace path instead of attaching to a conductor
+#### Scenario: Layout without conductors
+- **WHEN** the command center is activated for a workspace where no conductors are configured
+- **THEN** the conductors pane contains a single terminal surface with a shell in the workspace path
+
+### Requirement: Command center overlay support
+The command center layout SHALL support user customization via `defineOverlay`. Users SHALL be able to add panels, remove panels, and override panel properties without modifying the built-in layout. The overlay SHALL be discovered at `.codecorral/views/command-center.ts` (project-local) or `~/.codecorral/views/command-center.ts` (user-global).
+
+#### Scenario: User adds a panel via overlay
+- **WHEN** a user creates `.codecorral/views/command-center.ts` with an overlay adding a "daemon-log" terminal panel
+- **THEN** the resolved command center layout includes all base panels plus the "daemon-log" panel
+
+#### Scenario: User removes the board panel
+- **WHEN** a user creates an overlay with `remove: ["board"]`
+- **THEN** the resolved command center layout excludes the board browser panel
 
 ### Requirement: Command center state tracking
 The engine SHALL persist a `CommandCenterState` record per window containing the window ID (resolved via `system.identify()`), workspace ID, and a mapping of panel roles to surface IDs. This state SHALL be used for idempotency checks and recovery.
@@ -53,11 +64,11 @@ The engine SHALL persist a `CommandCenterState` record per window containing the
 - **THEN** the engine sets the workspace ID and all surface IDs to null, and the next `activate` rebuilds the command center from scratch
 
 ### Requirement: Workspace resolution
-The engine SHALL resolve which workspace configuration to use for the command center by matching the current working directory against configured workspace paths. If no match is found, the engine SHALL use a default configuration with no board URL and no conductor.
+The engine SHALL resolve which workspace configuration to use for the command center by matching the current working directory against configured workspace paths. If no match is found, the engine SHALL use a default configuration with no board URL and no conductors.
 
 #### Scenario: Workspace matched by path
 - **WHEN** `codecorral activate` is run from `/home/user/projects/myapp` and a workspace is configured with `path: /home/user/projects/myapp`
-- **THEN** the engine uses that workspace's `board` and `conductor` configuration for the command center
+- **THEN** the engine uses that workspace's `board` and `conductors` configuration for the command center layout
 
 #### Scenario: No workspace match
 - **WHEN** `codecorral activate` is run from a directory that does not match any configured workspace path
