@@ -22,11 +22,11 @@ The CLI SHALL provide `codecorral activate` to bootstrap a command center worksp
 
 #### Scenario: Activate inside cmux
 - **WHEN** the user runs `codecorral activate` inside a cmux terminal
-- **THEN** the CLI detects `CMUX_WINDOW_ID`, connects to the daemon, and either creates the command center or reports that it already exists
+- **THEN** the CLI detects `CMUX_WORKSPACE_ID`, resolves the window ID via `system.identify()`, connects to the daemon, and either creates the command center or reports that it already exists
 
 #### Scenario: Activate outside cmux
-- **WHEN** the user runs `codecorral activate` outside cmux (no `CMUX_WINDOW_ID`)
-- **THEN** the CLI prints a message: "Not inside cmux (CMUX_WINDOW_ID not set). Start cmux first, then run 'codecorral activate' from any terminal pane." and exits with code 1
+- **WHEN** the user runs `codecorral activate` outside cmux (no `CMUX_WORKSPACE_ID`)
+- **THEN** the CLI prints a message: "Not inside cmux (CMUX_WORKSPACE_ID not set). Start cmux first, then run 'codecorral activate' from any terminal pane." and exits with code 1
 
 #### Scenario: Activate when already active
 - **WHEN** the user runs `codecorral activate` and a command center already exists for the current window

@@ -4,11 +4,11 @@ The engine can drive workflow workspaces in cmux, but there is no "home base" �
 
 ## What Changes
 
-- New `codecorral activate` CLI command that bootstraps a command center workspace in the current cmux window
-- Environment detection via cmux environment variables (`CMUX_WORKSPACE_ID`, `CMUX_WINDOW_ID`, etc.) to determine if running inside cmux
-- Idempotent activation: re-running `activate` is a no-op if the command center already exists for the current window
+- New `codecorral activate` CLI command that bootstraps a command center workspace in cmux
+- Environment detection via `CMUX_WORKSPACE_ID` env var to determine if running inside cmux
+- Idempotent activation: re-running `activate` is a no-op if the command center already exists
 - Command center workspace is pinned to position 0 in the cmux sidebar, never closed by the engine
-- Initial command center layout: conductor terminal pane (attached to the window's conductor session) + tracking board browser pane
+- Initial command center layout: conductor terminal pane (attached via `agent-deck session attach`) + tracking board browser pane
 - Declarative layout system for the command center, reusing the same view engine reconciliation mechanism used for workflow workspaces
 - One command center per cmux window (window = project/profile per C2 mapping)
 - Outside cmux: `codecorral activate` prints a message directing the user to run it inside cmux
@@ -27,5 +27,5 @@ The engine can drive workflow workspaces in cmux, but there is no "home base" �
 - `src/cli/` — new `activate` command
 - `src/config/` — workspace config schema extended with `board` and conductor fields
 - View engine (when implemented) — command center layout becomes a first-class view config alongside workflow phase view configs
-- C2 contract — uses existing cmux primitives (createWorkspace, splitSurface, openBrowserSplit, sendText); no new contract operations needed
+- C2 contract — uses existing cmux primitives (createWorkspace, splitSurface, openBrowserSplit, sendText) plus a new `pinned` option on `createWorkspace` (contract extension required)
 - Depends on conductor sessions existing (Unit 3) for the terminal attachment; can scaffold without them initially

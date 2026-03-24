@@ -7,8 +7,9 @@
 
 ## 2. Cmux Environment Detection
 
-- [ ] 2.1 Create `src/cmux/env.ts` module that reads cmux environment variables (`CMUX_WINDOW_ID`, `CMUX_WORKSPACE_ID`, `CMUX_SURFACE_ID`) and exports a `detectCmuxContext()` function returning `{ windowId, workspaceId, surfaceId } | null`
-- [ ] 2.2 Add tests for `detectCmuxContext` with env vars set and unset
+- [ ] 2.1 Create `src/cmux/env.ts` module that reads `CMUX_WORKSPACE_ID` and `CMUX_SURFACE_ID` env vars and exports a `detectCmuxContext()` function returning `{ workspaceId, surfaceId } | null`
+- [ ] 2.2 Create `src/cmux/client.ts` with a `resolveWindowId()` function that calls `system.identify()` via the cmux socket and returns `{ windowId, workspaceId, surfaceId }`
+- [ ] 2.3 Add tests for `detectCmuxContext` with env vars set and unset, and for `resolveWindowId` with mocked socket
 
 ## 3. Command Center Layout
 
@@ -19,13 +20,13 @@
 ## 4. Command Center Activation
 
 - [ ] 4.1 Create `src/cmux/activate.ts` with the activation logic: detect cmux context, resolve workspace by matching CWD against configured paths, build layout, issue cmux primitives (createWorkspace, splitSurface, sendText, openBrowserSplit)
-- [ ] 4.2 Implement idempotency check: query daemon for existing `CommandCenterState` by window ID, return early if already active
+- [ ] 4.2 Implement idempotency check: resolve window ID via `system.identify()`, query daemon for existing `CommandCenterState` by window ID, return early if already active
 - [ ] 4.3 Implement workspace resolution: match `process.cwd()` against configured workspace paths to determine which workspace config to use
 - [ ] 4.4 Persist `CommandCenterState` after successful activation (window ID, workspace ID, panel role → surface ID mapping)
 
 ## 5. CLI Command
 
-- [ ] 5.1 Create `src/cli/commands/activate.ts` with Commander command definition: detect cmux env, bail with message if outside cmux, otherwise send activation request to daemon
+- [ ] 5.1 Create `src/cli/commands/activate.ts` with Commander command definition: detect cmux env via `CMUX_WORKSPACE_ID`, bail with message if outside cmux, resolve window ID via `system.identify()`, then send activation request to daemon
 - [ ] 5.2 Register `activate` command in `src/cli/index.ts`
 - [ ] 5.3 Implement the outside-cmux error message with helpful guidance (per design D6)
 

@@ -16,14 +16,14 @@ The engine SHALL support a command center workspace per cmux window. The command
 - **THEN** the engine returns the existing command center status without creating a new workspace
 
 ### Requirement: Cmux environment detection
-The engine SHALL detect whether it is running inside cmux by checking for the `CMUX_WINDOW_ID` environment variable. The window ID SHALL be used to associate the command center with a specific cmux window.
+The engine SHALL detect whether it is running inside cmux by checking for the `CMUX_WORKSPACE_ID` environment variable. When inside cmux, the engine SHALL call `system.identify()` via the cmux socket to resolve the current window ID. The window ID SHALL be used to associate the command center with a specific cmux window.
 
 #### Scenario: Running inside cmux
-- **WHEN** `codecorral activate` is run and `CMUX_WINDOW_ID` is set
-- **THEN** the engine proceeds with activation for the detected window
+- **WHEN** `codecorral activate` is run and `CMUX_WORKSPACE_ID` is set
+- **THEN** the engine calls `system.identify()` to resolve the window ID and proceeds with activation for the detected window
 
 #### Scenario: Running outside cmux
-- **WHEN** `codecorral activate` is run and `CMUX_WINDOW_ID` is not set
+- **WHEN** `codecorral activate` is run and `CMUX_WORKSPACE_ID` is not set
 - **THEN** the engine prints a message directing the user to start cmux first, and exits with code 1
 
 ### Requirement: Declarative command center layout
@@ -31,7 +31,7 @@ The command center layout SHALL be declared as a structured configuration with a
 
 #### Scenario: Layout with conductor terminal and tracking board
 - **WHEN** the command center is activated for a workspace with `board` URL and `conductor.name` configured
-- **THEN** the command center creates two panels: a terminal panel running `agent-deck attach {conductor.name}` in the main position, and a browser panel showing the board URL split to the right
+- **THEN** the command center creates two panels: a terminal panel running `agent-deck session attach {conductor.name}` in the main position, and a browser panel showing the board URL split to the right
 
 #### Scenario: Layout without board URL
 - **WHEN** the command center is activated for a workspace where `board` is not configured
@@ -42,7 +42,7 @@ The command center layout SHALL be declared as a structured configuration with a
 - **THEN** the terminal panel opens a shell in the workspace path instead of attaching to a conductor
 
 ### Requirement: Command center state tracking
-The engine SHALL persist a `CommandCenterState` record per window containing the window ID, workspace ID, and a mapping of panel roles to surface IDs. This state SHALL be used for idempotency checks and recovery.
+The engine SHALL persist a `CommandCenterState` record per window containing the window ID (resolved via `system.identify()`), workspace ID, and a mapping of panel roles to surface IDs. This state SHALL be used for idempotency checks and recovery.
 
 #### Scenario: State persisted after activation
 - **WHEN** the command center is successfully created
