@@ -29,9 +29,13 @@ The existing codebase uses:
 
 ## Decisions
 
-### SD1: Shell out via `Bun.spawn`, not a Node.js SDK
+### SD1: Shell out via `node:child_process`, not a Bun-only API
 
-Wrap agent-deck CLI commands via `Bun.spawn` with JSON parsing of stdout. Agent-deck has no programmatic SDK — CLI is the stable contract (C1). Using `Bun.spawn` is consistent with the existing runtime.
+Wrap agent-deck CLI commands via `child_process.spawn` with JSON parsing of stdout. Agent-deck has no programmatic SDK — CLI is the stable contract (C1).
+
+Using `node:child_process` instead of `Bun.spawn` keeps the production code portable across Node.js and Bun runtimes. Bun is the dev runtime (fast startup, native TypeScript, `bun test`), but source code uses only `node:` APIs so the packaged CLI works for anyone with Node 20+ or Bun.
+
+**Alternative considered:** `Bun.spawn`. Rejected — locks production code to Bun, means `npm install -g codecorral` fails under Node.js. The `node:child_process` API works identically under both runtimes.
 
 **Alternative considered:** Importing agent-deck internals directly. Rejected — couples to implementation, violates the customer-supplier boundary.
 
@@ -98,21 +102,25 @@ Note: agent-deck limits parent-child to **two levels** (`set-parent` rejects if 
 
 This is a standalone async function (not a `fromPromise` actor) because it's a composite operation used within other service actors. It's exposed as a helper that `stopSessionActor` calls internally when `recursive: true` is passed.
 
-### SD6: Prompt templates as composable builder functions
+### SD6: Session prompts as input to `createSession`, not an OpenSpec integration
 
-Session prompts are built from composable segments:
+The session prompt is derived from workflow context at session creation time and passed as the `-m` flag to `agent-deck launch`. It is **not** an OpenSpec integration point — the engine does not call OpenSpec's CLI or inject schema-specific instructions. That's the agent's domain: the agent uses OpenSpec slash commands (`/opsx:continue`, `/opsx:apply`, etc.) based on its own CLAUDE.md and the schema's artifact instructions.
+
+The prompt contains only engine-level concerns:
 
 ```typescript
 buildSessionPrompt({
-  instanceId: string,
-  phase: string,
-  workflowTools: string[],    // MCP tool names available
-  commitGuidance?: string,    // e.g., "Use conventional commits with scope"
-  additionalContext?: string,  // Extension point for Unit 4+
+  instanceId: string,          // WFE_INSTANCE_ID injection
+  phase: string,               // "elaboration", "implementation", etc.
+  workflowTools: string[],     // MCP tool names the agent can call
+  commitGuidance?: string,     // "commit before signaling artifact.ready"
+  additionalContext?: string,  // Extension point for Unit 4+ (NOT OpenSpec-specific)
 }): string
 ```
 
-Each segment is a pure function returning a string block. The builder concatenates them. This keeps prompts testable without agent-deck and extensible for later units that add schema-specific content.
+The prompt tells the agent: "your instance ID is X, you're in phase Y, you have these workflow tools, follow these commit conventions." It does **not** tell the agent how to use OpenSpec — that knowledge comes from the schema instructions, which the agent retrieves via slash commands.
+
+Each segment is a pure function returning a string block. The builder concatenates them.
 
 ### SD7: `test-v0.2` state machine design
 

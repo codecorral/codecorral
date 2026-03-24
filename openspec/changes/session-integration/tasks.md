@@ -1,6 +1,6 @@
 ## 1. Session Service Actors
 
-- [ ] 1.1 Create `src/services/agent-deck.ts` with shared `execAgentDeck` helper that runs agent-deck CLI commands via `Bun.spawn` with configurable timeout (`AbortSignal.timeout()`), captures stdout/stderr, parses error JSON body for semantic `code` field (`AMBIGUOUS`, `ALREADY_EXISTS`, etc.), and returns `{ exitCode, stdout, stderr }` — rejecting with `{ exitCode, stderr, command, code? }` on non-zero exit
+- [ ] 1.1 Create `src/services/agent-deck.ts` with shared `execAgentDeck` helper that runs agent-deck CLI commands via `node:child_process.spawn` (portable across Node and Bun) with configurable timeout (`AbortSignal.timeout()`), captures stdout/stderr, parses error JSON body for semantic `code` field (`AMBIGUOUS`, `ALREADY_EXISTS`, etc.), and returns `{ exitCode, stdout, stderr }` — rejecting with `{ exitCode, stderr, command, code? }` on non-zero exit
 - [ ] 1.2 Implement `createSessionActor` (`fromPromise`) wrapping `agent-deck launch` with typed `CreateSessionInput` (including optional `group` for `-g` flag) and `SessionRef` output, handling all launch flags (`-t`, `-c`, `-p`, `-g`, `-w`, `-b`, `--location`, `--mcp`, `-m`, `--json`). Timeout: 60s.
 - [ ] 1.3 Implement `sendMessageActor` (`fromPromise`) wrapping `agent-deck session send`
 - [ ] 1.4 Implement `stopSessionActor` (`fromPromise`) wrapping `agent-deck session stop` with optional `recursive` flag that delegates to `stopSessionTree`
