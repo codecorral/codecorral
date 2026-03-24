@@ -84,12 +84,34 @@ The engine SHALL provide a `listSessions` service actor (`fromPromise`) that inv
 - **WHEN** `listSessions` is invoked with a prefix that matches no sessions
 - **THEN** the actor resolves with an empty array
 
-### Requirement: Service actor error shape
-All session service actors SHALL reject with a consistent error shape: `{ exitCode: number, stderr: string, command: string }`. This enables workflow definitions to pattern-match on exit codes in `onError` transitions.
+### Requirement: getOutput service actor
+The engine SHALL provide a `getOutput` service actor (`fromPromise`) that invokes `agent-deck session output --json` and returns the last agent response as a string. This is needed by Unit 3 (conductor) for polling agent completion.
 
-#### Scenario: Error shape consistency
-- **WHEN** any session service actor fails due to a non-zero exit code from agent-deck
-- **THEN** the rejection value contains `exitCode`, `stderr`, and `command` fields
+#### Scenario: Successful output retrieval
+- **WHEN** `getOutput` is invoked with title `cc-abc12345-agent`
+- **THEN** the actor executes `agent-deck session output "cc-abc12345-agent" --json` and returns the response text
+
+#### Scenario: Output from non-existent session
+- **WHEN** `agent-deck session output` exits with code 2
+- **THEN** the actor rejects with an error containing `exitCode: 2`
+
+### Requirement: Service actor error shape with semantic codes
+All session service actors SHALL reject with a consistent error shape: `{ exitCode: number, stderr: string, command: string, code?: string }`. The `code` field SHALL be parsed from agent-deck's JSON error response body when available (e.g., `NOT_FOUND`, `ALREADY_EXISTS`, `AMBIGUOUS`, `INVALID_OPERATION`).
+
+#### Scenario: Error shape with semantic code
+- **WHEN** agent-deck returns exit code 1 with stderr `{"success":false,"error":"Multiple sessions match","code":"AMBIGUOUS"}`
+- **THEN** the rejection value contains `{ exitCode: 1, stderr: "...", command: "...", code: "AMBIGUOUS" }`
+
+#### Scenario: Error shape without JSON body
+- **WHEN** agent-deck returns exit code 1 with plain text stderr
+- **THEN** the rejection value contains `{ exitCode: 1, stderr: "...", command: "...", code: undefined }`
+
+### Requirement: Service actor timeouts
+All session service actors SHALL support configurable timeouts via `AbortSignal.timeout()`. Default timeouts: `createSession` 60s, `sendMessage` 30s, `stopSession` 10s, `showSession` 5s, `getOutput` 5s. Timeout SHALL kill the spawned process and reject with `{ exitCode: -1, stderr: "timeout", command: "..." }`.
+
+#### Scenario: Session creation timeout
+- **WHEN** `createSession` does not complete within 60 seconds
+- **THEN** the spawned process is killed and the actor rejects with exitCode -1
 
 ### Requirement: Service actors are registered in XState setup
 All session service actors SHALL be exported as named actor creators compatible with XState v5's `setup({ actors: { ... } })` pattern, allowing workflow definitions to reference them by name and override them via `.provide()` for testing.

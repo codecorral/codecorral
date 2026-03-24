@@ -2,7 +2,7 @@
 
 The engine-core (Unit 1) provides an XState actor runtime, snapshot persistence, MCP server, CLI, and daemon — but all workflow definitions are pure state machines with synchronous guards and actions. The `test-v0.1` workflow has no `invoke` calls, no external I/O, and no session management. To drive real agent workflows, the engine needs to call agent-deck's CLI for session lifecycle operations.
 
-Agent-deck v0.8.x exposes session management via CLI commands (`launch`, `session send`, `session stop`, `remove`, `session show --json`, `list --json`, `mcp attach`, `session restart`, `session set-parent`). These are the C1 contract operations. The engine wraps each as a `fromPromise` service actor — XState's mechanism for async, fallible operations that report results via `onDone`/`onError`.
+Agent-deck (v0.26+) exposes session management via CLI commands (`launch`, `session send`, `session stop`, `remove`, `session show --json`, `list --json`, `mcp attach`, `session restart`, `session set-parent`). These are the C1 contract operations. The engine wraps each as a `fromPromise` service actor — XState's mechanism for async, fallible operations that report results via `onDone`/`onError`.
 
 The existing codebase uses:
 - `src/actors/definition-registry.ts` for registering workflow definitions
@@ -37,7 +37,11 @@ Wrap agent-deck CLI commands via `Bun.spawn` with JSON parsing of stdout. Agent-
 
 ### SD2: One `fromPromise` per CLI operation, composed in workflow definitions
 
-Each C1 operation gets its own `fromPromise` actor creator (e.g., `createSessionActor`, `sendMessageActor`, `stopSessionActor`). Workflow definitions compose these in their `invoke` fields. This keeps service actors single-responsibility and independently testable.
+Each C1 operation gets its own `fromPromise` actor creator (e.g., `createSessionActor`, `sendMessageActor`, `stopSessionActor`, `getOutputActor`). Workflow definitions compose these in their `invoke` fields. This keeps service actors single-responsibility and independently testable.
+
+The full set of service actors: `createSession`, `sendMessage`, `stopSession`, `removeSession`, `showSession`, `getOutput`, `attachMcp`, `setParent`, `listSessions`.
+
+Note: `getOutput` wraps `agent-deck session output --json` — needed by Unit 3 (conductor) for polling agent completion. Including it now avoids a gap downstream.
 
 **Alternative considered:** A single "session manager" actor that handles all operations via messages. Rejected — XState's `invoke` + `onDone`/`onError` pattern is the idiomatic way to model async I/O, and it gives each state clear success/failure handling.
 
@@ -64,20 +68,33 @@ Set this in your environment: export WFE_INSTANCE_ID="{instanceId}"
 
 The MCP server already resolves `WFE_INSTANCE_ID` from `process.env` (see `src/mcp/server.ts:22-24`). The agent reads the initial message and sets the env var, making all subsequent `workflow.*` MCP tool calls resolve automatically.
 
+**Verification:** After session creation, the engine can verify `WFE_INSTANCE_ID` is set by having the agent call `workflow.status()` as part of its startup. If the call succeeds (returns instance data), the env var is working. If it fails (no instance context), the prompt injection didn't take effect. This verification is optional in `test-v0.2` but recommended for production workflows in Unit 4.
+
 **Alternative considered:** Writing a `.env` file to the worktree. Rejected — pollutes the working tree and requires cleanup. The initial message approach is ephemeral and self-documenting.
 
-### SD5: Recursive `stopSessionTree` with list-filter-recurse
+### SD5: Recursive `stopSessionTree` with per-session parent discovery
 
-Agent-deck has no atomic recursive stop. The engine implements:
+Agent-deck has no atomic recursive stop. Additionally, `agent-deck list --json` does **not** include a `parent` field — parent information is only available via `session show --json` per session.
+
+The engine discovers children by: (1) listing all sessions with `list --json`, (2) filtering by the workflow's title prefix (`cc-{shortId}-*`), (3) calling `session show --json` on each to get the parent field, (4) recursing depth-first on children.
 
 ```
 stopSessionTree(title):
   sessions = exec("agent-deck list --json")
-  children = sessions.filter(s => s.parent === title)
+  workflowSessions = sessions.filter(s => s.title.startsWith(prefix))
+  children = []
+  for s in workflowSessions:
+    info = exec("agent-deck session show {s.title} --json")
+    if info.parent === title:
+      children.push(s)
   for child in children:
     await stopSessionTree(child.title)   // depth-first
   await exec("agent-deck session stop {title}")
 ```
+
+This is O(n) `show` calls where n = sessions matching the workflow prefix (typically 2-5, not all sessions). The prefix filter keeps it bounded.
+
+Note: agent-deck limits parent-child to **two levels** (`set-parent` rejects if parent is itself a child). The recursion handles this correctly but never goes deeper than one level in practice.
 
 This is a standalone async function (not a `fromPromise` actor) because it's a composite operation used within other service actors. It's exposed as a helper that `stopSessionActor` calls internally when `recursive: true` is passed.
 
@@ -101,12 +118,14 @@ Each segment is a pure function returning a string block. The builder concatenat
 
 ```
 idle --[start]--> setup --[invoke:createSession onDone]--> agent_working
+agent_working --[send_message]--> sending --[invoke:sendMessage onDone]--> agent_working
 agent_working --[impl.complete]--> teardown
 teardown --[invoke:stopSession onDone]--> cleanup
 cleanup --[invoke:removeSession onDone]--> done
 
 Error paths:
 setup --[invoke:createSession onError]--> setup_failed (final)
+sending --[invoke:sendMessage onError]--> agent_working (log error, continue)
 teardown --[invoke:stopSession onError]--> done  (best-effort cleanup)
 ```
 
@@ -114,16 +133,35 @@ Context extends `test-v0.1`:
 - `sessionTitle: string | null` — set by `createSession` onDone
 - `sessionError: string | null` — set on any service error
 
+The `sending` state exercises `sendMessageActor` — a mid-conversation message path that Unit 3 (conductor) and Unit 4 (unit-workflow) depend on. Without testing it here, the first consumer would be a production workflow with no prior integration proof.
+
+The `createSession` input accepts an optional `group` parameter (`-g` flag) for organizing sessions by project. Not used by `test-v0.2` but exposed in the input type so Unit 3 doesn't need to change the interface.
+
 The machine uses `setup()` with actors registered via the `actors` field — XState v5's way to declare invoked service actors that can be overridden via `.provide()` for testing.
 
-### SD8: Service actor error handling — exit codes + stderr
+### SD8: Service actor error handling — exit codes + error JSON + timeouts
 
 All service actors interpret agent-deck exit codes per C1 guarantees:
 - Exit 0 = success, parse stdout as JSON
-- Exit 1 = error, capture stderr as error message
+- Exit 1 = error, parse stderr for JSON error envelope (`{ success, error, code }`)
 - Exit 2 = not found (session doesn't exist)
 
-Errors are surfaced as rejected promises, which XState routes to `onError` transitions. The error object includes `{ exitCode, stderr, command }` for debuggability.
+Agent-deck returns semantic error codes in the JSON body: `NOT_FOUND`, `ALREADY_EXISTS`, `AMBIGUOUS`, `INVALID_OPERATION`. The error shape includes these:
+
+```typescript
+type AgentDeckError = {
+  exitCode: number
+  stderr: string
+  command: string
+  code?: string  // parsed from error JSON: "NOT_FOUND" | "ALREADY_EXISTS" | "AMBIGUOUS" | ...
+}
+```
+
+**`AMBIGUOUS` handling:** If two sessions match the same title (possible at different paths), agent-deck returns `AMBIGUOUS`. Service actors surface this as a distinct error for workflow definitions to handle (e.g., fall back to session ID).
+
+**Timeouts:** Each `fromPromise` actor wraps `Bun.spawn` with a configurable timeout via `AbortSignal.timeout()`. Defaults: `createSession` 60s, `sendMessage` 30s, `stopSession` 10s, `showSession` 5s. Timeout triggers process kill and rejects with `{ exitCode: -1, stderr: "timeout", command }`.
+
+**`stopSession` treats exit code 2 as success** (idempotent — session already gone). This prevents teardown failures when a session was cleaned up by agent-deck's own timeouts.
 
 ### SD9: Migration from test-v0.1 to test-v0.2
 

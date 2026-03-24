@@ -4,10 +4,10 @@ The engine-core (Unit 1) ships with a `test-v0.1` workflow that validates the ac
 
 ## What Changes
 
-- Add `fromPromise` service actors wrapping each C1 operation: `createSession` (agent-deck `launch`), `sendMessage` (`session send`), `stopSession` (`session stop`), `removeSession` (`remove`), `showSession` (`session show --json`), `attachMcp` (`mcp attach` + `session restart`), `setParent` (`session set-parent`)
+- Add `fromPromise` service actors wrapping each C1 operation: `createSession` (agent-deck `launch`), `sendMessage` (`session send`), `stopSession` (`session stop`), `removeSession` (`remove`), `showSession` (`session show --json`), `getOutput` (`session output --json`), `attachMcp` (`mcp attach` + `session restart`), `setParent` (`session set-parent`). Each actor has configurable timeouts via `AbortSignal.timeout()` and parses agent-deck's error JSON for semantic error codes (`AMBIGUOUS`, `ALREADY_EXISTS`, etc.)
 - Add `listSessions` service for discovery: `agent-deck list --json` filtered by title prefix
 - Implement deterministic session title generation: `cc-{workflowId}-{phase}` with sanitization (`[a-z0-9-]` only, max 60 chars)
-- Implement `stopSessionTree(title)` — recursive child session teardown by listing children via `list --json`, recursing depth-first, then stopping the parent
+- Implement `stopSessionTree(title)` — recursive child session teardown by listing workflow sessions via `list --json`, querying parent via `session show --json` per session, recursing depth-first, then stopping the parent. Parent-child is limited to two levels by agent-deck.
 - Implement session prompt template system — composable prompt builder that injects phase-appropriate context, commit guidance, and workflow MCP tool references into initial messages
 - Inject `WFE_INSTANCE_ID` into sessions via the initial message (agent reads and sets env)
 - Register `test-v0.2` workflow definition extending `test-v0.1` with `SETUP → AGENT_WORKING → TEARDOWN` states that invoke session service actors
@@ -38,7 +38,7 @@ The engine-core (Unit 1) ships with a `test-v0.1` workflow that validates the ac
 - `src/actors/definition-registry.ts` — Register `test-v0.2`, add migration from `test-v0.1`
 
 **Runtime dependencies:**
-- agent-deck CLI v0.8.x must be installed and on PATH
+- agent-deck CLI v0.26+ must be installed and on PATH
 - Sessions require a tmux server running
 
 **Runtime artifacts:**

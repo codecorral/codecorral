@@ -1,19 +1,21 @@
 ## ADDED Requirements
 
 ### Requirement: Recursive child session teardown
-The engine SHALL provide a `stopSessionTree` function that stops a session and all its descendants. It SHALL list all sessions via `agent-deck list --json`, identify children by matching the `parent` field to the target title, recurse depth-first into each child, then stop the target session.
+The engine SHALL provide a `stopSessionTree` function that stops a session and all its descendants. It SHALL list sessions via `agent-deck list --json` filtered by the workflow's title prefix, then call `agent-deck session show --json` on each to discover the `parent` field (which is not available in `list --json` output). It SHALL recurse depth-first into children, then stop the target session. `stopSession` SHALL treat exit code 2 (not found) as success for idempotent teardown.
+
+Note: agent-deck limits parent-child to two levels — `set-parent` rejects if the parent is itself a child. The recursion handles this correctly but never goes deeper than one level in practice.
 
 #### Scenario: Stop session with no children
-- **WHEN** `stopSessionTree` is called for title `cc-abc12345-setup` and no sessions have `parent` matching that title
+- **WHEN** `stopSessionTree` is called for title `cc-abc12345-setup` and no sessions have `parent` matching that title (after querying each via `show`)
 - **THEN** only `agent-deck session stop "cc-abc12345-setup"` is executed
 
 #### Scenario: Stop session with children
-- **WHEN** `stopSessionTree` is called for title `cc-abc12345-agent` and two sessions have `parent: "cc-abc12345-agent"` — `cc-abc12345-sub1` and `cc-abc12345-sub2`
-- **THEN** `cc-abc12345-sub1` and `cc-abc12345-sub2` are stopped first (depth-first), then `cc-abc12345-agent` is stopped
+- **WHEN** `stopSessionTree` is called for title `cc-abc12345-agent` and `session show` reveals two sessions with `parent: "cc-abc12345-agent"`
+- **THEN** both children are stopped first (depth-first), then `cc-abc12345-agent` is stopped
 
-#### Scenario: Stop session with nested children
-- **WHEN** `stopSessionTree` is called for title `parent` which has child `child1`, and `child1` has child `grandchild1`
-- **THEN** `grandchild1` is stopped first, then `child1`, then `parent`
+#### Scenario: Stop already-removed session succeeds
+- **WHEN** `agent-deck session stop` returns exit code 2 (not found)
+- **THEN** `stopSessionTree` treats this as success and continues
 
 ### Requirement: stopSession actor supports recursive mode
 The `stopSession` service actor SHALL accept an optional `recursive` boolean parameter. When `recursive` is `true`, the actor SHALL call `stopSessionTree` instead of a direct `agent-deck session stop`.
