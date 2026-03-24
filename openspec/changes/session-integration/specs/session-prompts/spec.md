@@ -1,58 +1,51 @@
 ## ADDED Requirements
 
-### Requirement: Composable session prompt builder
-The engine SHALL provide a `buildSessionPrompt` function that composes an initial session message from structured parameters: `instanceId`, `phase`, `workflowTools` (array of MCP tool names), optional `commitGuidance`, and optional `additionalContext`.
+### Requirement: Phase prompts declared in workflow definition context
+Workflow definitions SHALL declare phase-specific prompts in the machine context under a `prompts` key. Each key in `prompts` maps a phase name to the prompt string for that phase. The prompt is the definition author's instructions to the agent — what to do, what tools to use, what artifacts to produce.
 
-#### Scenario: Build prompt with all parameters
-- **WHEN** `buildSessionPrompt` is called with `{ instanceId: "test-v0.2-abc12345", phase: "setup", workflowTools: ["workflow.transition", "workflow.status"], commitGuidance: "Use conventional commits", additionalContext: "This is a test workflow" }`
-- **THEN** the returned string contains the instance ID instruction, phase context, tool reference, commit guidance, and additional context as distinct sections
+#### Scenario: Definition declares phase prompts
+- **WHEN** a workflow definition is created with `context.prompts = { elaboration: "You are elaborating...", implementation: "You are implementing..." }`
+- **THEN** those prompts are available in context for use as `createSession` initial messages
 
-### Requirement: Instance ID injection block
-The session prompt SHALL include a clearly delimited block instructing the agent to set `WFE_INSTANCE_ID` as an environment variable, containing the exact instance ID value.
+#### Scenario: Phase prompt used at session creation
+- **WHEN** a state invokes `createSession` and derives `initialMessage` from `context.prompts.elaboration`
+- **THEN** the session receives the elaboration-specific prompt as its initial message
 
-#### Scenario: Instance ID block present
-- **WHEN** a session prompt is built with instance ID `test-v0.2-abc12345`
-- **THEN** the prompt contains text instructing the agent to run `export WFE_INSTANCE_ID="test-v0.2-abc12345"` and explains this enables automatic workflow MCP tool resolution
+### Requirement: Engine preamble auto-prepended to phase prompts
+The engine SHALL prepend a preamble to the phase prompt before passing it to `createSession`. The preamble contains engine-level concerns only: `WFE_INSTANCE_ID` injection instruction and available workflow MCP tools. The phase prompt is appended as-is.
 
-### Requirement: Phase context section
-The session prompt SHALL include a section describing the current workflow phase and the agent's role within it.
+#### Scenario: Preamble prepended to phase prompt
+- **WHEN** `assembleSessionPrompt` is called with instanceId `test-v0.2-abc12345`, phasePrompt `"You are in a test workflow."`, and tools `["workflow.transition", "workflow.status"]`
+- **THEN** the returned string starts with the instance ID instruction block and tool listing, followed by the phase prompt
 
-#### Scenario: Phase context for setup
-- **WHEN** a prompt is built with phase `setup`
-- **THEN** the prompt contains a section describing the setup phase context
+#### Scenario: Empty phase prompt gets only preamble
+- **WHEN** `assembleSessionPrompt` is called with an empty phasePrompt
+- **THEN** the returned string contains only the preamble (instance ID + tools)
 
-### Requirement: Workflow tool reference section
-The session prompt SHALL list the available workflow MCP tools so the agent knows how to interact with the engine.
+### Requirement: assembleSessionPrompt function
+The engine SHALL provide an `assembleSessionPrompt(instanceId, phasePrompt, workflowTools)` function that concatenates the engine preamble with the definition-provided phase prompt. This is a thin formatter, not a prompt authoring system.
 
-#### Scenario: Tool reference included
-- **WHEN** a prompt is built with `workflowTools: ["workflow.transition", "workflow.status", "workflow.context"]`
-- **THEN** the prompt contains a section listing these tools with brief descriptions of their purpose
+#### Scenario: Function signature and output
+- **WHEN** `assembleSessionPrompt("test-v0.2-abc12345", "Call workflow.transition('impl.complete') when done.", ["workflow.transition", "workflow.status", "workflow.context"])` is called
+- **THEN** the result contains three sections: (1) instance ID export instruction, (2) workflow tool listing, (3) the phase prompt text
 
-### Requirement: Commit guidance section (optional)
-When `commitGuidance` is provided, the session prompt SHALL include a section with commit message formatting instructions. When omitted, this section SHALL be absent.
+### Requirement: Preamble instance ID block
+The preamble SHALL include a clearly delimited block instructing the agent to set `WFE_INSTANCE_ID` as an environment variable, containing the exact instance ID value.
 
-#### Scenario: Commit guidance present
-- **WHEN** a prompt is built with `commitGuidance: "Use conventional commits with scope matching the unit name"`
-- **THEN** the prompt contains a commit guidance section with the provided text
+#### Scenario: Instance ID block format
+- **WHEN** the preamble is generated for instance `test-v0.2-abc12345`
+- **THEN** it contains text instructing the agent to run `export WFE_INSTANCE_ID="test-v0.2-abc12345"` and explains this enables automatic workflow MCP tool resolution
 
-#### Scenario: Commit guidance absent
-- **WHEN** a prompt is built without `commitGuidance`
-- **THEN** the prompt does not contain a commit guidance section
+### Requirement: Preamble workflow tool listing
+The preamble SHALL list the available workflow MCP tools so the agent knows how to interact with the engine.
 
-### Requirement: Additional context section (optional)
-When `additionalContext` is provided, the session prompt SHALL append it as-is. This is the extension point for later units to inject schema-specific content.
+#### Scenario: Tool listing included
+- **WHEN** the preamble is generated with tools `["workflow.transition", "workflow.status", "workflow.context"]`
+- **THEN** it contains a section listing these tools with brief descriptions
 
-#### Scenario: Additional context present
-- **WHEN** a prompt is built with `additionalContext: "You are elaborating unit brief X"`
-- **THEN** the prompt ends with a section containing the provided text
+### Requirement: Prompts are overridable via definition precedence
+Since prompts live in the machine context, they follow definition precedence (D19): CLI-embedded defaults can be overridden by user-level or project-level definition files. This allows users to customize phase prompts without forking the workflow definition.
 
-#### Scenario: Additional context absent
-- **WHEN** a prompt is built without `additionalContext`
-- **THEN** no additional context section appears
-
-### Requirement: Prompt segments are pure functions
-Each section of the prompt (instance ID block, phase context, tool reference, commit guidance, additional context) SHALL be produced by an individually exported pure function. This enables unit testing of each segment independently.
-
-#### Scenario: Individual segment testability
-- **WHEN** `renderInstanceIdBlock("test-v0.2-abc12345")` is called directly
-- **THEN** it returns a string containing the instance ID instruction block without requiring the full `buildSessionPrompt` parameters
+#### Scenario: Override via .provide()
+- **WHEN** a workflow actor is created with `.provide({ ... })` that modifies the initial context
+- **THEN** the prompts in context reflect the override, not the defaults

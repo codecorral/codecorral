@@ -25,11 +25,9 @@
 
 ## 4. Session Prompts
 
-- [ ] 4.1 Create `src/services/session-prompts.ts` with `renderInstanceIdBlock(instanceId)` — returns instruction text for setting `WFE_INSTANCE_ID`
-- [ ] 4.2 Implement `renderPhaseContext(phase)` — returns phase description section
-- [ ] 4.3 Implement `renderToolReference(workflowTools)` — returns MCP tool listing section
-- [ ] 4.4 Implement `renderCommitGuidance(guidance)` — returns commit section (empty string if null)
-- [ ] 4.5 Implement `buildSessionPrompt({ instanceId, phase, workflowTools, commitGuidance?, additionalContext? })` — composes all segments
+- [ ] 4.1 Create `src/services/session-prompts.ts` with `renderPreamble(instanceId, workflowTools)` — returns engine preamble string (instance ID export instruction + tool listing)
+- [ ] 4.2 Implement `assembleSessionPrompt(instanceId, phasePrompt, workflowTools)` — prepends engine preamble to the definition-provided phase prompt. Thin formatter, not a prompt authoring system.
+- [ ] 4.3 Define `context.prompts` structure for `test-v0.2`: minimal prompt for agent phase ("You are in a test workflow. Call `workflow.transition('impl.complete')` when done.")
 
 ## 5. test-v0.2 Workflow Definition
 
@@ -38,7 +36,7 @@
 - [ ] 5.3 Implement `agent_working` state with `impl.complete` → `teardown` and `send_message` → `sending` transitions
 - [ ] 5.3a Implement `sending` state with `invoke: sendMessage` — `onDone` → `agent_working`, `onError` → `agent_working` (log error, continue)
 - [ ] 5.4 Implement `teardown` as compound state or sequential invocations — `stopSession` (recursive) then `removeSession`, with error fallthrough to `done`
-- [ ] 5.5 Wire initial message via `buildSessionPrompt` in `createSession` input derivation
+- [ ] 5.5 Wire initial message: `createSession` input derives `initialMessage` from `assembleSessionPrompt(context.instanceId, context.prompts.agent, workflowTools)`
 
 ## 6. Definition Registry Integration
 
@@ -48,7 +46,7 @@
 ## 7. Tests
 
 - [ ] 7.1 Unit tests for session naming: `extractShortId`, `sanitizeTitle`, `generateSessionTitle`, `getSessionPrefix` — covering edge cases (long titles, special chars, consecutive hyphens)
-- [ ] 7.2 Unit tests for session prompts: each `render*` function and `buildSessionPrompt` composition — verify segments present/absent based on optional params
+- [ ] 7.2 Unit tests for session prompts: `renderPreamble` (instance ID block + tool listing) and `assembleSessionPrompt` (preamble + phase prompt concatenation) — verify preamble always present, phase prompt appended as-is, empty phase prompt yields preamble only
 - [ ] 7.3 Unit tests for `test-v0.2` machine using `.provide()` to mock service actors — verify happy path (including `send_message` → `sending` → `agent_working`), setup failure, sending error fallthrough, and teardown error fallthrough
 - [ ] 7.4 Unit test for `test-v0.1 → test-v0.2` migration — verify state mapping and context extension
 - [ ] 7.5 Unit tests for `execAgentDeck` error JSON parsing — verify `code` field extraction from stderr, timeout behavior, and `AMBIGUOUS`/`ALREADY_EXISTS` error codes

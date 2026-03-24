@@ -8,8 +8,8 @@ The engine-core (Unit 1) ships with a `test-v0.1` workflow that validates the ac
 - Add `listSessions` service for discovery: `agent-deck list --json` filtered by title prefix
 - Implement deterministic session title generation: `cc-{workflowId}-{phase}` with sanitization (`[a-z0-9-]` only, max 60 chars)
 - Implement `stopSessionTree(title)` — recursive child session teardown by listing workflow sessions via `list --json`, querying parent via `session show --json` per session, recursing depth-first, then stopping the parent. Parent-child is limited to two levels by agent-deck.
-- Implement session prompt template system — composable prompt builder that injects phase-appropriate context, commit guidance, and workflow MCP tool references into initial messages
-- Inject `WFE_INSTANCE_ID` into sessions via the initial message (agent reads and sets env)
+- Implement session prompt assembly — engine prepends a preamble (instance ID injection, workflow tool listing) to the phase-specific prompt declared in the workflow definition's context. Phase prompts are authored by the definition, not computed by the engine.
+- Inject `WFE_INSTANCE_ID` into sessions via the preamble in the initial message (agent reads and sets env)
 - Register `test-v0.2` workflow definition extending `test-v0.1` with `SETUP → AGENT_WORKING → TEARDOWN` states that invoke session service actors
 - Register a `test-v0.1 → test-v0.2` migration in the definition registry
 
@@ -19,7 +19,7 @@ The engine-core (Unit 1) ships with a `test-v0.1` workflow that validates the ac
 - `session-services`: `fromPromise` service actors wrapping all C1 agent-deck CLI operations with typed inputs/outputs, exit code interpretation, and JSON parsing
 - `session-naming`: Deterministic session title generation from workflow ID + phase, title sanitization, and prefix-based session discovery
 - `session-lifecycle`: Recursive child session teardown (`stopSessionTree`), session state queries via `showSession`, and lifecycle sequencing (running → stopped → removed)
-- `session-prompts`: Composable prompt template system for injecting phase context, commit guidance, workflow MCP tool reference, and `WFE_INSTANCE_ID` into initial session messages
+- `session-prompts`: Session prompt assembly — engine preamble (instance ID, workflow tools) prepended to phase-specific prompts declared in the workflow definition context. Prompts are definition-authored and overridable via `.provide()` or definition precedence (D19).
 - `test-workflow-v02`: `test-v0.2` workflow definition with `SETUP → AGENT_WORKING → TEARDOWN` states that invoke `createSession`, wait for agent completion, then invoke `stopSession` + `removeSession`
 
 ### Modified Capabilities

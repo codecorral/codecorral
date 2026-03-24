@@ -102,25 +102,63 @@ Note: agent-deck limits parent-child to **two levels** (`set-parent` rejects if 
 
 This is a standalone async function (not a `fromPromise` actor) because it's a composite operation used within other service actors. It's exposed as a helper that `stopSessionActor` calls internally when `recursive: true` is passed.
 
-### SD6: Session prompts as input to `createSession`, not an OpenSpec integration
+### SD6: Phase prompts declared in the workflow definition, engine prepends preamble
 
-The session prompt is derived from workflow context at session creation time and passed as the `-m` flag to `agent-deck launch`. It is **not** an OpenSpec integration point — the engine does not call OpenSpec's CLI or inject schema-specific instructions. That's the agent's domain: the agent uses OpenSpec slash commands (`/opsx:continue`, `/opsx:apply`, etc.) based on its own CLAUDE.md and the schema's artifact instructions.
-
-The prompt contains only engine-level concerns:
+Session prompts are **authored as part of the workflow definition**, not derived by a generic utility. Each phase that creates a session has a prompt in the machine's context that tells the agent what to do in that phase. The elaboration prompt is different from the implementation prompt is different from the review prompt — they're phase-specific documents, not computed strings.
 
 ```typescript
-buildSessionPrompt({
-  instanceId: string,          // WFE_INSTANCE_ID injection
-  phase: string,               // "elaboration", "implementation", etc.
-  workflowTools: string[],     // MCP tool names the agent can call
-  commitGuidance?: string,     // "commit before signaling artifact.ready"
-  additionalContext?: string,  // Extension point for Unit 4+ (NOT OpenSpec-specific)
-}): string
+setup({
+  // ...
+}).createMachine({
+  context: {
+    prompts: {
+      elaboration: `You are elaborating unit brief "{unitBrief.name}".
+        Use /opsx:continue to generate each artifact.
+        Commit cohesive changes as you work.
+        Before signaling artifact.ready, ensure all changes are committed.`,
+      implementation: `You are implementing tasks from the spec.
+        Use /opsx:apply to get your task list.
+        Use conventional commits. Create a PR when implementation is complete.`,
+    },
+    // ... other context
+  },
+  states: {
+    elaboration_setup: {
+      invoke: {
+        src: 'createSession',
+        input: ({ context }) => ({
+          title: generateSessionTitle(context.instanceId, 'elab'),
+          initialMessage: context.prompts.elaboration,  // phase prompt from definition
+          // ...
+        }),
+      }
+    }
+  }
+})
 ```
 
-The prompt tells the agent: "your instance ID is X, you're in phase Y, you have these workflow tools, follow these commit conventions." It does **not** tell the agent how to use OpenSpec — that knowledge comes from the schema instructions, which the agent retrieves via slash commands.
+**The engine prepends a preamble** to whatever prompt the definition provides. The preamble contains engine-level concerns only:
 
-Each segment is a pure function returning a string block. The builder concatenates them.
+```
+[Engine Preamble — auto-injected, not part of the definition]
+Your workflow instance ID is: {instanceId}
+Set this in your environment: export WFE_INSTANCE_ID="{instanceId}"
+
+Available workflow tools: workflow.transition, workflow.status, workflow.context
+
+[Phase Prompt — from the workflow definition]
+{context.prompts[phase]}
+```
+
+This means:
+- **Workflow definitions own the phase prompts** — versioned with the definition, overridable via `.provide()` or definition precedence (D19)
+- **The engine owns the preamble** — instance ID injection, tool listing. Always prepended, never authored by the definition.
+- **OpenSpec-specific instructions live in the phase prompt**, written by the definition author — not injected by the engine. The engine has no knowledge of OpenSpec.
+- **Custom workflows** (authoring skill, Unit 8) define their own phase prompts. The engine just prepends the preamble.
+
+For `test-v0.2`, prompts are minimal: "You are in a test workflow. Call `workflow.transition('impl.complete')` when done." For `unit-v1.0` in Unit 4, they're rich with OpenSpec slash command guidance, artifact expectations, and review criteria.
+
+The `assembleSessionPrompt(instanceId, phasePrompt, workflowTools)` function handles preamble + phase prompt concatenation. It's a thin formatter, not a prompt authoring system.
 
 ### SD7: `test-v0.2` state machine design
 
