@@ -49,8 +49,9 @@ codecorral/
     specs/           # Main specifications
     config.yaml      # OpenSpec configuration
   nix/
-    hm-module.nix    # Home Manager module for schema distribution
-  flake.nix          # Nix flake — builds & distributes schemas
+    hm-module.nix              # Home Manager module for schema distribution
+    codecorral-hm-module.nix   # Home Manager module for project configuration
+  flake.nix                    # Nix flake — builds, distributes schemas & projects
 ```
 
 ## Development Guidelines

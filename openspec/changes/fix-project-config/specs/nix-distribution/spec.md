@@ -14,7 +14,6 @@ Global agent-deck configuration (conductor, MCPs, shell, docker) is the user's r
 - **WHEN** the user declares:
   ```nix
   programs.codecorral.enable = true;
-  programs.codecorral.agent_deck.conductor.enable = true;
   programs.codecorral.projects.my-project = {
     path = "/path/to/project";
     workflows = [ "intent" "unit" ];
@@ -33,7 +32,7 @@ Global agent-deck configuration (conductor, MCPs, shell, docker) is the user's r
         - unit
       agent_deck_profile: my-project
   ```
-  Agent-deck conductor settings, claude-code model, and openspec schemas are NOT in config.yaml — they are delegated to upstream modules.
+  Claude-code model and openspec schemas are NOT in config.yaml — they are delegated to upstream modules. Global agent-deck settings are configured directly via `programs.agent-deck`.
 
 #### Scenario: Generated config is valid YAML
 - **WHEN** the HM module generates `~/.codecorral/config.yaml`

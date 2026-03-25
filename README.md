@@ -37,7 +37,7 @@ A **conductor** (one per profile) bridges the engine and the outside world — i
 - **State machines:** XState v5
 - **CLI:** Commander
 - **MCP:** Model Context Protocol SDK for tool integration
-- **Distribution:** Nix flake + Home Manager module for schema distribution
+- **Distribution:** Nix flake + Home Manager modules for schema distribution and project configuration
 
 ## Project Structure
 
@@ -46,7 +46,7 @@ codecorral/
   src/
     actors/          # XState actor definitions
     cli/             # CLI entry point (commander)
-    config/          # Workspace and workflow configuration
+    config/          # Project and workflow configuration
     daemon/          # Engine daemon lifecycle
     mcp/             # MCP server for tool integration
     persistence/     # XState snapshot persistence
@@ -56,8 +56,9 @@ codecorral/
     specs/           # Main specifications
     config.yaml      # OpenSpec configuration
   nix/
-    hm-module.nix    # Home Manager module for schema distribution
-  flake.nix          # Nix flake — builds & distributes schemas
+    hm-module.nix              # Home Manager module for schema distribution
+    codecorral-hm-module.nix   # Home Manager module for project configuration
+  flake.nix                    # Nix flake — builds, distributes schemas & projects
 ```
 
 ## Commands
@@ -218,7 +219,7 @@ home-manager.users.yourname = {
 The module auto-sets two defaults per project (overridable):
 
 - **Profile name = project name.** `projects.foo` creates `programs.agent-deck.profiles.foo` and `programs.claude-code.profiles.foo`.
-- **Shared `config_dir`.** Both agent-deck and claude-code profiles get `config_dir = ".claude-<project_name>"` so they share the same Claude identity.
+- **Shared `configDir`.** Both agent-deck and claude-code profiles get `configDir = ".claude-<project_name>"` so they share the same Claude identity.
 
 To override:
 ```nix
@@ -242,7 +243,5 @@ projects:
 Tool-specific configuration (Claude model, agents, rules, skills) is delegated to the upstream modules — it does NOT appear in `config.yaml`.
 
 ## License
-
-TBD
 
 TBD

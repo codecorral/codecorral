@@ -76,14 +76,6 @@ in
   };
 
   config = lib.mkIf cfg.enable {
-    # Assert no duplicate profile names (project names are profile names)
-    assertions = [
-      {
-        assertion = (lib.length projectNames) == (lib.length (lib.unique projectNames));
-        message = "Duplicate profile names across CodeCorral projects: ${builtins.toJSON projectNames}";
-      }
-    ];
-
     # Generate ~/.codecorral/config.yaml with engine-own state only
     home.file.".codecorral/config.yaml".source =
       yamlFormat.generate "codecorral-config.yaml" configData;

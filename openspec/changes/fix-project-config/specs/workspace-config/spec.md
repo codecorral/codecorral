@@ -39,8 +39,8 @@ The engine SHALL support config at two levels: user-level (`~/.codecorral/config
 ## REMOVED Requirements
 
 ### Requirement: Agent-deck profile configuration per workspace
-**Reason**: Agent-deck global settings now live at `programs.codecorral.agent_deck` (top-level, not per-project). Per-project agent-deck is limited to `claude.config_dir` (auto-set by convention). The engine's `config.yaml` only stores the profile name reference.
-**Migration**: Set global agent-deck settings at `programs.codecorral.agent_deck` in Nix. Per-project profile creation is automatic.
+**Reason**: Agent-deck global settings are configured directly via `programs.agent-deck` (not proxied through CodeCorral). Per-project agent-deck is limited to `claude.config_dir` (auto-set by convention). The engine's `config.yaml` only stores the profile name reference.
+**Migration**: Set global agent-deck settings directly via `programs.agent-deck` in your HM config. Per-project profile creation is automatic.
 
 ### Requirement: Claude Code profile configuration per workspace
 **Reason**: Claude Code configuration is now a full pass-through to agentplot-kit's `programs.claude_code.profiles.<name>` via the HM module. The engine's `config.yaml` does not store claude-code settings.
