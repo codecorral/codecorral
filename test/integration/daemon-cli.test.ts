@@ -93,7 +93,7 @@ describe("integration: client-only CLI reads", () => {
     expect(read).toBeNull();
   });
 
-  it("should read workspaces from config.yaml without daemon", () => {
+  it("should read projects from config.yaml without daemon", () => {
     const configDir = path.join(os.homedir(), ".codecorral");
     const configPath = path.join(configDir, "config.yaml");
     let originalContent: string | null = null;
@@ -102,16 +102,18 @@ describe("integration: client-only CLI reads", () => {
     } catch { /* doesn't exist */ }
 
     fs.mkdirSync(configDir, { recursive: true });
-    fs.writeFileSync(configPath, `workspaces:
-  test-ws:
-    path: /tmp/test-ws
+    fs.writeFileSync(configPath, `projects:
+  test-proj:
+    path: /tmp/test-proj
     workflows:
       - intent
+    agent_deck_profile: test-proj
 `);
 
     const config = loadConfig();
-    expect(config.workspaces["test-ws"]).toBeDefined();
-    expect(config.workspaces["test-ws"].path).toBe("/tmp/test-ws");
+    expect(config.projects["test-proj"]).toBeDefined();
+    expect(config.projects["test-proj"].path).toBe("/tmp/test-proj");
+    expect(config.projects["test-proj"].agent_deck_profile).toBe("test-proj");
 
     // Restore
     if (originalContent !== null) {
@@ -133,19 +135,19 @@ describe("integration: config merging", () => {
 
     // Write user config
     fs.mkdirSync(configDir, { recursive: true });
-    fs.writeFileSync(configPath, `workspaces:
+    fs.writeFileSync(configPath, `projects:
   merge-test:
     path: /tmp/merge-test
     workflows:
       - intent
-    agentDeckProfile: user-profile
+    agent_deck_profile: user-profile
 `);
 
     // Create project config dir
     const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), "cc-test-"));
     const projectConfigDir = path.join(projectDir, ".codecorral");
     fs.mkdirSync(projectConfigDir, { recursive: true });
-    fs.writeFileSync(path.join(projectConfigDir, "config.yaml"), `workspaces:
+    fs.writeFileSync(path.join(projectConfigDir, "config.yaml"), `projects:
   merge-test:
     path: /tmp/merge-test-override
     workflows:
@@ -154,8 +156,8 @@ describe("integration: config merging", () => {
 
     const config = loadConfig(projectDir);
     // Project path should override user
-    expect(config.workspaces["merge-test"].path).toBe("/tmp/merge-test-override");
-    expect(config.workspaces["merge-test"].workflows).toEqual(["unit"]);
+    expect(config.projects["merge-test"].path).toBe("/tmp/merge-test-override");
+    expect(config.projects["merge-test"].workflows).toEqual(["unit"]);
 
     // Restore
     if (originalContent !== null) {

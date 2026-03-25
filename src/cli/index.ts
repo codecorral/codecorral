@@ -4,7 +4,7 @@ import { Command } from "commander";
 import { statusCommand } from "./commands/status.js";
 import { historyCommand } from "./commands/history.js";
 import { transitionCommand } from "./commands/transition.js";
-import { workspacesCommand } from "./commands/workspaces.js";
+import { projectsCommand } from "./commands/projects.js";
 import { daemonCommand } from "./commands/daemon.js";
 import { gcCommand } from "./commands/gc.js";
 
@@ -18,7 +18,7 @@ program
 program.addCommand(statusCommand());
 program.addCommand(historyCommand());
 program.addCommand(transitionCommand());
-program.addCommand(workspacesCommand());
+program.addCommand(projectsCommand());
 program.addCommand(daemonCommand());
 program.addCommand(gcCommand());
 

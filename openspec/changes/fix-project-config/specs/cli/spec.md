@@ -1,11 +1,11 @@
 ## MODIFIED Requirements
 
 ### Requirement: codecorral projects command
-The CLI SHALL provide `codecorral projects` to enumerate all configured projects from `~/.codecorral/config.yaml` with their paths, enabled workflows, and status (whether the path exists and is accessible).
+The CLI SHALL provide `codecorral projects` to enumerate all configured projects from `~/.codecorral/config.yaml` with their paths, enabled workflows, agent-deck profile name (reference only), and whether the path exists on disk. The CLI SHALL NOT display tool-specific settings (claude-code model, agent-deck conductor config, etc.) — those are owned by upstream modules.
 
 #### Scenario: List configured projects
 - **WHEN** the user runs `codecorral projects` and config.yaml defines two projects
-- **THEN** the CLI displays each project name, path, enabled workflows, and whether the path exists on disk
+- **THEN** the CLI displays each project name, path, enabled workflows, agent-deck profile reference, and whether the path exists on disk
 
 #### Scenario: No config file
 - **WHEN** the user runs `codecorral projects` and `~/.codecorral/config.yaml` does not exist

@@ -29,27 +29,15 @@ export interface PersistedWorkflowInstance {
   };
 }
 
-export interface WorkspaceConfig {
+export interface ProjectConfig {
   path: string;
   workflows?: string[];
-  agentDeckProfile?: string;
-  claudeCodeProfile?: string;
-  agentDeck?: {
-    profile?: string;
-  };
-  claudeCode?: {
-    model?: string;
-    apiKey?: string;
-  };
-  openspec?: {
-    schemas?: string[];
-    schemasPath?: string;
-    config?: Record<string, unknown>;
-  };
+  agent_deck_profile?: string;
+  openspec_schemas_path?: string;
 }
 
 export interface CodeCorralConfig {
-  workspaces: Record<string, WorkspaceConfig>;
+  projects: Record<string, ProjectConfig>;
 }
 
 export type MigrationFn = (snapshot: Snapshot<unknown>) => Snapshot<unknown>;

@@ -234,9 +234,9 @@ function registerHandlers(connection: MessageConnection): void {
     },
   );
 
-  connection.onRequest("workspaces", () => {
+  connection.onRequest("projects", () => {
     const config = loadConfig();
-    return { workspaces: config.workspaces };
+    return { projects: config.projects };
   });
 
   connection.onRequest("daemon.status", () => {

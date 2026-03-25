@@ -2,7 +2,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
 import { parse as parseYaml } from "yaml";
-import type { CodeCorralConfig, WorkspaceConfig } from "../actors/types.js";
+import type { CodeCorralConfig, ProjectConfig } from "../actors/types.js";
 
 const USER_CONFIG_PATH = path.join(os.homedir(), ".codecorral", "config.yaml");
 
@@ -23,12 +23,12 @@ function loadConfigFile(filePath: string): CodeCorralConfig {
     const content = fs.readFileSync(filePath, "utf-8");
     const parsed = parseYaml(content) as Record<string, unknown> | null;
     if (!parsed || typeof parsed !== "object") {
-      return { workspaces: {} };
+      return { projects: {} };
     }
-    const workspaces = (parsed.workspaces ?? {}) as Record<string, WorkspaceConfig>;
-    return { workspaces };
+    const projects = (parsed.projects ?? {}) as Record<string, ProjectConfig>;
+    return { projects };
   } catch {
-    return { workspaces: {} };
+    return { projects: {} };
   }
 }
 
@@ -36,16 +36,16 @@ function mergeConfigs(
   userConfig: CodeCorralConfig,
   projectConfig: CodeCorralConfig,
 ): CodeCorralConfig {
-  const merged: CodeCorralConfig = { workspaces: { ...userConfig.workspaces } };
+  const merged: CodeCorralConfig = { projects: { ...userConfig.projects } };
 
-  for (const [name, projectWs] of Object.entries(projectConfig.workspaces)) {
-    if (merged.workspaces[name]) {
-      merged.workspaces[name] = {
-        ...merged.workspaces[name],
-        ...projectWs,
+  for (const [name, projectProj] of Object.entries(projectConfig.projects)) {
+    if (merged.projects[name]) {
+      merged.projects[name] = {
+        ...merged.projects[name],
+        ...projectProj,
       };
     } else {
-      merged.workspaces[name] = projectWs;
+      merged.projects[name] = projectProj;
     }
   }
 

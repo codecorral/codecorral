@@ -7,7 +7,7 @@ TO: Config file format
 ## MODIFIED Requirements
 
 ### Requirement: Config file format
-The engine SHALL read project configuration from `~/.codecorral/config.yaml`. The config file SHALL define projects as a map keyed by project name under the `projects:` key. Each project specifies a `path`, optional `workflows` list, optional `agent_deck_profile` (reference name), and optional `openspec` section with `schemas_path`. Tool-specific configuration (agent-deck settings, claude-code settings, openspec schemas) SHALL NOT appear in `config.yaml` — that configuration is owned by the upstream modules.
+The engine SHALL read project configuration from `~/.codecorral/config.yaml`. The config file SHALL use snake_case for all keys. The config file SHALL define projects as a map keyed by project name under the `projects:` key. Each project specifies a `path`, optional `workflows` list, optional `agent_deck_profile` (string reference to the profile name), and optional `openspec` section with `schemas_path`. Tool-specific configuration (agent-deck settings, claude-code settings, openspec schemas) SHALL NOT appear in `config.yaml` — that configuration is owned by the upstream modules.
 
 #### Scenario: Parse valid config file
 - **WHEN** the engine reads a `config.yaml` with two project entries under the `projects:` key
@@ -20,6 +20,10 @@ The engine SHALL read project configuration from `~/.codecorral/config.yaml`. Th
 #### Scenario: Config file does not exist
 - **WHEN** `~/.codecorral/config.yaml` does not exist
 - **THEN** the engine starts with an empty project list and no error
+
+#### Scenario: Config uses snake_case keys
+- **WHEN** the engine reads a `config.yaml` with keys `projects`, `agent_deck_profile`, `schemas_path`
+- **THEN** all keys are parsed correctly using snake_case convention
 
 ### Requirement: Config merging across levels
 The engine SHALL support config at two levels: user-level (`~/.codecorral/config.yaml`) and project-level (`.codecorral/config.yaml` within a project directory). When both exist for the same project, project-level settings SHALL take precedence for project-specific fields.
@@ -35,13 +39,13 @@ The engine SHALL support config at two levels: user-level (`~/.codecorral/config
 ## REMOVED Requirements
 
 ### Requirement: Agent-deck profile configuration per workspace
-**Reason**: Agent-deck configuration is now a full pass-through to the upstream `programs.agent-deck` module via the HM module's delegation. The engine's `config.yaml` only stores the profile name reference, not the profile contents.
-**Migration**: Declare agent-deck settings in `programs.codecorral.projects.<name>.agent_deck` (Nix) which delegates to `programs.agent-deck.profiles.<name>`.
+**Reason**: Agent-deck global settings now live at `programs.codecorral.agent_deck` (top-level, not per-project). Per-project agent-deck is limited to `claude.config_dir` (auto-set by convention). The engine's `config.yaml` only stores the profile name reference.
+**Migration**: Set global agent-deck settings at `programs.codecorral.agent_deck` in Nix. Per-project profile creation is automatic.
 
 ### Requirement: Claude Code profile configuration per workspace
-**Reason**: Claude Code configuration is now a full pass-through to the upstream `programs.claude-code` module via the HM module's delegation. The engine's `config.yaml` does not store claude-code settings.
-**Migration**: Declare claude-code settings in `programs.codecorral.projects.<name>.claude_code` (Nix) which delegates to `programs.claude-code.profiles.<name>`.
+**Reason**: Claude Code configuration is now a full pass-through to agentplot-kit's `programs.claude_code.profiles.<name>` via the HM module. The engine's `config.yaml` does not store claude-code settings.
+**Migration**: Declare claude-code settings in `programs.codecorral.projects.<name>.claude_code` (Nix) which delegates to `programs.claude_code.profiles.<name>`.
 
 ### Requirement: OpenSpec schema configuration per workspace
-**Reason**: OpenSpec schema configuration is now delegated to the upstream `programs.openspec` module. Only `schemas_path` (project-local, engine-relevant) remains in `config.yaml`.
+**Reason**: OpenSpec schema configuration is delegated to the upstream `programs.openspec` module. Only `schemas_path` (project-local, engine-relevant) remains in `config.yaml`.
 **Migration**: Declare schemas in `programs.codecorral.projects.<name>.openspec.schemas` (Nix) which delegates to `programs.openspec.schemas`.

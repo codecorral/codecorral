@@ -28,39 +28,72 @@ describe("config loader", () => {
   it("should return empty config when file does not exist", () => {
     try { fs.unlinkSync(configPath); } catch { /* ignore */ }
     const config = loadConfig();
-    expect(config.workspaces).toEqual({});
+    expect(config.projects).toEqual({});
   });
 
-  it("should parse valid config file", () => {
+  it("should parse valid config file with snake_case keys", () => {
     fs.mkdirSync(configDir, { recursive: true });
     fs.writeFileSync(
       configPath,
-      `workspaces:
+      `projects:
   my-project:
     path: /tmp/my-project
     workflows:
       - intent
       - unit
-    agentDeckProfile: my-project
+    agent_deck_profile: my-project
 `,
     );
 
     const config = loadConfig();
-    expect(config.workspaces["my-project"]).toBeDefined();
-    expect(config.workspaces["my-project"].path).toBe("/tmp/my-project");
-    expect(config.workspaces["my-project"].workflows).toEqual(["intent", "unit"]);
+    expect(config.projects["my-project"]).toBeDefined();
+    expect(config.projects["my-project"].path).toBe("/tmp/my-project");
+    expect(config.projects["my-project"].workflows).toEqual(["intent", "unit"]);
+    expect(config.projects["my-project"].agent_deck_profile).toBe("my-project");
   });
 
   it("should handle malformed config gracefully", () => {
     fs.mkdirSync(configDir, { recursive: true });
     fs.writeFileSync(configPath, "not: valid: yaml: [[[");
 
-    // Should not throw
     const config = loadConfig();
-    expect(config.workspaces).toBeDefined();
+    expect(config.projects).toBeDefined();
   });
 
   it("should return correct config path", () => {
     expect(getUserConfigPath()).toBe(configPath);
+  });
+
+  it("should merge user and project configs", () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "codecorral-test-"));
+    const projectConfigDir = path.join(tmpDir, ".codecorral");
+    fs.mkdirSync(projectConfigDir, { recursive: true });
+
+    fs.mkdirSync(configDir, { recursive: true });
+    fs.writeFileSync(
+      configPath,
+      `projects:
+  my-project:
+    path: /tmp/my-project
+    agent_deck_profile: my-project
+`,
+    );
+
+    fs.writeFileSync(
+      path.join(projectConfigDir, "config.yaml"),
+      `projects:
+  my-project:
+    path: /tmp/my-project
+    workflows:
+      - intent
+      - unit
+`,
+    );
+
+    const config = loadConfig(tmpDir);
+    expect(config.projects["my-project"].workflows).toEqual(["intent", "unit"]);
+    expect(config.projects["my-project"].agent_deck_profile).toBe("my-project");
+
+    fs.rmSync(tmpDir, { recursive: true });
   });
 });
