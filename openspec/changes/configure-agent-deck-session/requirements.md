@@ -46,6 +46,6 @@ A team has a base deck shared across all members and project-specific decks per 
 - No ralph-tui session configuration — operations group starts empty
 - No conductor markdown file authoring — conductor `.md` files are referenced in the deck but authored separately
 - No changes to `programs.agent-deck` (`nix-agent-deck` repo) — it remains the generic config.toml generator
-- No shuffle internal changes beyond `--profile` flag (shuffle#1), error handling fix (shuffle#3), and file path resolution (shuffle#4)
+- No shuffle internal changes — all prerequisites delivered (shuffle#1-4 closed)
 - No deletion or cleanup semantics — shuffle is additive-only, removing sessions requires manual `agent-deck` CLI usage
 - No collision detection for layered decks — two decks defining the same session name in the same group will silently skip the second definition

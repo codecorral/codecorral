@@ -38,10 +38,10 @@ Five systems participate in agent-deck session management today:
 
 | System | Repo | What changes |
 |--------|------|--------------|
-| CodeCorral HM module | `codecorral` | Refactored from `programs.openspec` to `programs.codecorral`; gains deck profile management and shuffle activation |
-| CodeCorral flake | `codecorral` | Adds shuffle as a flake input; exports the new HM module |
+| CodeCorral HM module | `codecorral` | Existing `programs.codecorral` (already has `projects`) gains `schemas` (migrated from `programs.openspec`) and deck profile management with shuffle activation |
+| CodeCorral flake | `codecorral` | Adds shuffle as a flake input |
 | Deck YAML | `codecorral` | New file: `decks/codecorral.deck.yaml` defining 6-group layout |
-| Shuffle CLI | `shuffle` | Gains `--profile` flag (shuffle#1), `flake.nix` (shuffle#2), error handling fix (shuffle#3), and file path resolution for Nix store (shuffle#4) |
+| Shuffle CLI | `shuffle` | Prerequisites delivered (shuffle#1-4 all closed) — no changes needed |
 
 **Outside** (not changed, but interacted with):
 
@@ -77,15 +77,26 @@ The activation pipeline gains a new stage. This is additive — the schema insta
 
 **Namespace change — HM options:**
 ```
-Before:  programs.openspec.enable = true
-         programs.openspec.schemas = [ ... ]
-         programs.agent-deck.enable = true
+Before (current state after fix-project-config):
+  programs.openspec.enable = true                              # separate module
+  programs.openspec.schemas = [ ... ]                          # separate module
+  programs.codecorral.enable = true                            # projects module
+  programs.codecorral.projects.<name>.claude_code = { ... }    # per-project claude-code
+  programs.codecorral.projects.<name>.openspec.schemas = [...]  # per-project schema union
+  programs.agent-deck.enable = true                            # separate module
 
-After:   programs.codecorral.enable = true
-         programs.codecorral.schemas.enable = true
-         programs.codecorral.profiles.<name>.decks = [ ... ]
-         programs.agent-deck.enable = true  (unchanged)
+After (this intent):
+  programs.codecorral.enable = true
+  programs.codecorral.schemas = { ... }                        # migrated from programs.openspec
+  programs.codecorral.projects.<name>.claude_code = { ... }    # unchanged
+  programs.codecorral.projects.<name>.openspec.schemas = [...]  # unchanged
+  programs.codecorral.<decks TBD — namespace needs exploration>
+  programs.agent-deck.enable = true                            # unchanged
 ```
+
+NOTE: The exact namespace for deck profile configuration needs exploration. Options
+include `programs.codecorral.profiles.<name>.decks`, `programs.codecorral.decks.<name>`,
+or integrating with `programs.codecorral.projects.<name>`. See exploration notes.
 
 This is a breaking change for existing users of `programs.openspec`. Migration uses `mkRenamedOptionModule` to provide deprecation warnings and automatic option forwarding during a transition period.
 
