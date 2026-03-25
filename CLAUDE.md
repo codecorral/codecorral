@@ -39,7 +39,7 @@ codecorral/
   src/
     actors/          # XState actor definitions
     cli/             # CLI entry point (commander)
-    config/          # Workspace and workflow configuration
+    config/          # Project and workflow configuration
     daemon/          # Engine daemon lifecycle
     mcp/             # MCP server for tool integration
     persistence/     # XState snapshot persistence

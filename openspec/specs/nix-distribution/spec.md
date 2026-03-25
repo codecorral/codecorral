@@ -11,35 +11,40 @@ The Nix flake SHALL expose the `codecorral` CLI as a package (`packages.${system
 - **WHEN** the user runs `nix build .#codecorral`
 - **THEN** a result directory contains the `codecorral` binary with all dependencies bundled
 
-### Requirement: Home Manager module for workspace configuration
-The Nix flake SHALL expose a Home Manager module (`homeManagerModules.codecorral`) that generates `~/.codecorral/config.yaml` from declarative Nix expressions. The module SHALL use `programs.codecorral.enable` as its activation guard. The module SHALL delegate tool-specific configuration to upstream Nix modules (`programs.agent-deck`, `programs.claude-code`, `programs.openspec`) rather than reimplementing their config generation.
+### Requirement: Home Manager module for project configuration
+The Nix flake SHALL expose a Home Manager module (`homeManagerModules.codecorral`) that generates `~/.codecorral/config.yaml` from declarative Nix expressions and delegates tool-specific configuration to upstream Nix modules. The module SHALL use `programs.codecorral.enable` as its activation guard. The module SHALL require agentplot-kit's claude-code HM module (not the upstream nix-community one) for profile support. The generated config file SHALL be valid YAML and SHALL contain only engine-own state. Tool-specific settings SHALL be delegated to upstream modules as a per-project pass-through.
 
-#### Scenario: HM module generates config.yaml
+#### Scenario: HM module generates config.yaml with engine-own state
 - **WHEN** the user's Home Manager configuration includes:
   ```nix
   programs.codecorral.enable = true;
-  programs.codecorral.workspaces.my-project = {
+  programs.codecorral.projects.my-project = {
     path = "/path/to/project";
     workflows = [ "intent" "unit" ];
+    claude_code.settings.model = "claude-sonnet-4-6";
   };
   ```
-- **THEN** `home-manager switch` generates `~/.codecorral/config.yaml` with the workspace definition
+- **THEN** `home-manager switch` generates `~/.codecorral/config.yaml` containing only `path`, `workflows`, and `agent_deck_profile` for the project — not claude-code settings
 
-#### Scenario: Delegation to upstream modules
-- **WHEN** a workspace configures `agentDeck.profile = "my-project"` and `claudeCode.profile = { model = "claude-sonnet-4-6"; }`
-- **THEN** the CodeCorral module sets `programs.agent-deck.profiles.my-project` and `programs.claude-code.profiles.my-project` on the upstream modules. The upstream modules generate their own config files.
+#### Scenario: Per-project agent-deck profile creation
+- **WHEN** a project is declared
+- **THEN** the module creates `programs.agent-deck.profiles.<project_name>.claude.config_dir` set to `.claude-<project_name>` via `lib.mkDefault`
+
+#### Scenario: Per-project claude-code full pass-through
+- **WHEN** a project declares `claude_code` with settings, agents, rules, skills, or other options
+- **THEN** the module passes all settings through to `programs.claude-code.profiles.<project_name>.*` and auto-sets `config_dir` via `lib.mkDefault`
 
 #### Scenario: Upstream module not imported
-- **WHEN** `programs.agent-deck` is not imported in the user's HM config but a workspace references `agentDeck.profile`
-- **THEN** the delegation is skipped and `home-manager switch` produces a warning (not an error)
+- **WHEN** `programs.agent-deck` is not available in the user's HM config
+- **THEN** per-project agent-deck profile creation is skipped without error
 
 #### Scenario: Duplicate profile names rejected
-- **WHEN** two workspaces both map to `agentDeck.profile = "shared"`
-- **THEN** `home-manager switch` fails with an assertion error: "Duplicate agentDeck profile 'shared' across workspaces"
+- **WHEN** two projects would produce the same profile name
+- **THEN** `home-manager switch` fails with an assertion error
 
 #### Scenario: HM module ensures schema package availability
-- **WHEN** a workspace references `openspec.schemas = [ "dev.codecorral.intent@2026-03-11.0" ]`
-- **THEN** the HM module sets `programs.openspec.schemas` to the union of all workspace schema lists, and the upstream openspec module installs them globally
+- **WHEN** a project references `openspec.schemas = [ "dev.codecorral.intent@2026-03-11.0" ]`
+- **THEN** the HM module sets `programs.openspec.schemas` to the union of all project schema lists, and the upstream openspec module installs them globally
 
 ### Requirement: npm package for non-Nix installation
 The engine SHALL be published as an npm package with a `bin` entry for `codecorral`. Users SHALL be able to run `npx codecorral` or install globally via `npm install -g codecorral`.

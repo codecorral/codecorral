@@ -37,19 +37,19 @@ The CLI SHALL provide `codecorral transition <event> --instance <id> [--payload 
 - **WHEN** the user runs `codecorral transition review.revised --instance test-v0.1-a1b2c3d4 --payload '{"feedback":"needs tests"}'`
 - **THEN** the CLI sends the event with the parsed payload to the daemon and displays the result
 
-### Requirement: codecorral workspaces command
-The CLI SHALL provide `codecorral workspaces` to enumerate all configured workspaces from `~/.codecorral/config.yaml` with their paths, enabled workflows, and status (whether the path exists and is accessible).
+### Requirement: codecorral projects command
+The CLI SHALL provide `codecorral projects` to enumerate all configured projects from `~/.codecorral/config.yaml` with their paths, enabled workflows, agent-deck profile name (reference only), and whether the path exists on disk. The CLI SHALL NOT display tool-specific settings — those are owned by upstream modules.
 
-#### Scenario: List configured workspaces
-- **WHEN** the user runs `codecorral workspaces` and config.yaml defines two workspaces
-- **THEN** the CLI displays each workspace name, path, enabled workflows, and whether the path exists on disk
+#### Scenario: List configured projects
+- **WHEN** the user runs `codecorral projects` and config.yaml defines two projects
+- **THEN** the CLI displays each project name, path, enabled workflows, agent-deck profile reference, and whether the path exists on disk
 
 #### Scenario: No config file
-- **WHEN** the user runs `codecorral workspaces` and `~/.codecorral/config.yaml` does not exist
+- **WHEN** the user runs `codecorral projects` and `~/.codecorral/config.yaml` does not exist
 - **THEN** the CLI displays "No configuration found. Create ~/.codecorral/config.yaml or use Nix Home Manager module."
 
 ### Requirement: Client-only commands read persisted state directly
-Read-only CLI commands (`codecorral status`, `codecorral history`, `codecorral workspaces`) SHALL work without the daemon running by reading instance files and config directly from disk. The CLI SHALL silently skip instance files that return ENOENT during reads, treating them as archived.
+Read-only CLI commands (`codecorral status`, `codecorral history`, `codecorral projects`) SHALL work without the daemon running by reading instance files and config directly from disk. The CLI SHALL silently skip instance files that return ENOENT during reads, treating them as archived.
 
 #### Scenario: Status without daemon
 - **WHEN** the user runs `codecorral status` and no daemon is running

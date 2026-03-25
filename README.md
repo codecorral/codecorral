@@ -29,7 +29,7 @@ A **conductor** (one per profile) bridges the engine and the outside world — i
 - **Human review gates** — Explicit states in XState machines where the workflow pauses for human approval
 - **Conductor ownership** — All sessions are conductor children (`--parent conductor-{name}`), giving automatic transition notifications
 - **Task board as anti-corruption layer** — Intent and unit workflows communicate only through the board, keeping them independently evolvable
-- **Workspace = workflow instance** — One cmux workspace per workflow for its entire lifetime; phase transitions reconcile, never recreate
+- **Project = workflow instance** — One cmux workspace per workflow for its entire lifetime; phase transitions reconcile, never recreate
 
 ## Tech Stack
 
@@ -145,6 +145,104 @@ openspec schema which intent
 
 Project-local schemas always take precedence over user-level schemas installed this way.
 
+### Project Configuration via Home Manager (Nix)
+
+The `homeManagerModules.codecorral` module lets you declaratively define CodeCorral projects with per-project Claude Code configuration. It requires [agentplot-kit](https://github.com/agentplot/agentplot-kit)'s claude-code module for profile support (not the upstream nix-community one).
+
+#### 1. Add flake inputs
+
+```nix
+{
+  inputs = {
+    nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
+    home-manager.url = "github:nix-community/home-manager";
+    codecorral.url = "github:codecorral/codecorral";
+    agentplot-kit.url = "github:agentplot/agentplot-kit";
+    nix-agent-deck.url = "github:agentplot/nix-agent-deck";
+  };
+}
+```
+
+#### 2. Import modules
+
+```nix
+home-manager.users.yourname = {
+  # Disable upstream claude-code module, use agentplot-kit's instead
+  disabledModules = [ "programs/claude-code.nix" ];
+  imports = [
+    codecorral.homeManagerModules.codecorral
+    agentplot-kit.homeManagerModules.claude-code
+    nix-agent-deck.homeManagerModules.default
+  ];
+};
+```
+
+#### 3. Declare projects
+
+```nix
+{
+  programs.codecorral = {
+    enable = true;
+
+    projects.my-project = {
+      path = "/Users/you/Code/my-project";
+      workflows = [ "intent" "unit" ];
+
+      # Full pass-through to programs.claude-code.profiles.my-project
+      claude_code = {
+        settings.model = "claude-sonnet-4-6";
+        agents.code-reviewer = {
+          description = "Expert code review specialist";
+          tools = [ "Read" "Grep" ];
+          prompt = "You are an expert code reviewer.";
+        };
+        rules = [ "Always use conventional commits" ];
+      };
+
+      # Schemas collected as union across all projects
+      openspec.schemas = [ "dev.codecorral.intent@2026-03-11.0" ];
+    };
+  };
+
+  # Global agent-deck settings are configured directly — not via CodeCorral
+  programs.agent-deck = {
+    enable = true;
+    defaultTool = "claude";
+    conductor.enable = true;
+  };
+}
+```
+
+#### Conventions
+
+The module auto-sets two defaults per project (overridable):
+
+- **Profile name = project name.** `projects.foo` creates `programs.agent-deck.profiles.foo` and `programs.claude-code.profiles.foo`.
+- **Shared `config_dir`.** Both agent-deck and claude-code profiles get `config_dir = ".claude-<project_name>"` so they share the same Claude identity.
+
+To override:
+```nix
+programs.codecorral.projects.my-project.claude_code.configDir = ".claude-custom";
+```
+
+#### What goes in `config.yaml`
+
+The module generates `~/.codecorral/config.yaml` with engine-own state only:
+
+```yaml
+projects:
+  my-project:
+    path: /Users/you/Code/my-project
+    workflows:
+      - intent
+      - unit
+    agent_deck_profile: my-project
+```
+
+Tool-specific configuration (Claude model, agents, rules, skills) is delegated to the upstream modules — it does NOT appear in `config.yaml`.
+
 ## License
+
+TBD
 
 TBD

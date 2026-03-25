@@ -35,12 +35,12 @@
 
 ## 4. Update specs and documentation
 
-- [ ] 4.1 Rename `openspec/specs/workspace-config/` directory to `openspec/specs/project-config/` and update spec content.
-- [ ] 4.2 Update workspace → project terminology in `openspec/specs/cli/spec.md` and `openspec/specs/nix-distribution/spec.md`. Do NOT rename "workspace" in `openspec/explorations/workflow-engine/domain-model.md` (those refer to cmux workspaces).
-- [ ] 4.3 Add "Project Configuration via Home Manager" section to README.md: required flake inputs (codecorral, agentplot-kit, nix-agent-deck), `disabledModules` for upstream claude-code, full project declaration example (claude-code agents/rules/skills, openspec schemas), two conventions (profile name, shared config_dir) and how to override, note that config.yaml is engine-own state only, note that global agent-deck config is set directly via `programs.agent-deck`.
-- [ ] 4.4 Update README.md "Workspace = workflow instance" → "Project = workflow instance" and other workspace references.
-- [ ] 4.5 Update CLAUDE.md if any workspace references exist (project structure section).
-- [ ] 4.6 Add agentplot-kit as documented dependency in README installation section.
+- [x] 4.1 Rename `openspec/specs/workspace-config/` directory to `openspec/specs/project-config/` and update spec content.
+- [x] 4.2 Update workspace → project terminology in `openspec/specs/cli/spec.md` and `openspec/specs/nix-distribution/spec.md`. Do NOT rename "workspace" in `openspec/explorations/workflow-engine/domain-model.md` (those refer to cmux workspaces).
+- [x] 4.3 Add "Project Configuration via Home Manager" section to README.md: required flake inputs (codecorral, agentplot-kit, nix-agent-deck), `disabledModules` for upstream claude-code, full project declaration example (claude-code agents/rules/skills, openspec schemas), two conventions (profile name, shared config_dir) and how to override, note that config.yaml is engine-own state only, note that global agent-deck config is set directly via `programs.agent-deck`.
+- [x] 4.4 Update README.md "Workspace = workflow instance" → "Project = workflow instance" and other workspace references.
+- [x] 4.5 Update CLAUDE.md if any workspace references exist (project structure section).
+- [x] 4.6 Add agentplot-kit as documented dependency in README installation section.
 
 ## 5. Verification
 
