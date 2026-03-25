@@ -44,8 +44,8 @@
 
 ## 5. Verification
 
-- [ ] 5.1 Run `bun run typecheck` — no type errors (run BEFORE tests to catch type issues first).
-- [ ] 5.2 Clean `dist/` folder to avoid stale type declarations, then run `bun test` — all tests pass.
-- [ ] 5.3 Run `nix flake check` — flake validation passes.
-- [ ] 5.4 Verify HM module parses as valid Nix: `nix-instantiate --parse nix/codecorral-hm-module.nix`.
-- [ ] 5.5 Verify HM module doesn't error when upstream modules are not imported (test graceful skip).
+- [x] 5.1 Run `bun run typecheck` — no type errors (run BEFORE tests to catch type issues first).
+- [x] 5.2 Clean `dist/` folder to avoid stale type declarations, then run `bun test` — all tests pass.
+- [x] 5.3 Run `nix flake check` — flake validation passes.
+- [x] 5.4 Verify HM module parses as valid Nix: `nix-instantiate --parse nix/codecorral-hm-module.nix`.
+- [x] 5.5 Verify HM module doesn't error when upstream modules are not imported (test graceful skip).
