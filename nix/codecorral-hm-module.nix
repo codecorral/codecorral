@@ -3,43 +3,23 @@
 let
   cfg = config.programs.codecorral;
 
-  workspaceType = lib.types.submodule {
+  projectType = lib.types.submodule {
     options = {
       path = lib.mkOption {
         type = lib.types.str;
-        description = "Absolute path to the workspace directory";
+        description = "Absolute path to the project directory";
       };
 
       workflows = lib.mkOption {
         type = lib.types.listOf lib.types.str;
         default = [ ];
-        description = "List of workflow definitions to enable for this workspace";
+        description = "List of workflow definitions to enable for this project";
       };
 
-      agentDeck = lib.mkOption {
-        type = lib.types.submodule {
-          options.profile = lib.mkOption {
-            type = lib.types.nullOr lib.types.str;
-            default = null;
-            description = "Agent-deck profile name for session management";
-          };
-        };
+      claude_code = lib.mkOption {
+        type = lib.types.attrsOf lib.types.anything;
         default = { };
-        description = "Agent-deck configuration for this workspace";
-      };
-
-      claudeCode = lib.mkOption {
-        type = lib.types.submodule {
-          options = {
-            model = lib.mkOption {
-              type = lib.types.nullOr lib.types.str;
-              default = null;
-              description = "Default Claude model for agents";
-            };
-          };
-        };
-        default = { };
-        description = "Claude Code configuration for this workspace";
+        description = "Full pass-through to programs.claude-code.profiles.<name>. Accepts any options the agentplot-kit claude-code module supports (settings, agents, rules, skills, etc.).";
       };
 
       openspec = lib.mkOption {
@@ -50,44 +30,37 @@ let
               default = [ ];
               description = "List of OpenSpec schema references to install";
             };
-            schemasPath = lib.mkOption {
+            schemas_path = lib.mkOption {
               type = lib.types.nullOr lib.types.str;
               default = null;
               description = "Relative path to project-local schemas";
             };
-            config = lib.mkOption {
-              type = lib.types.attrsOf lib.types.anything;
-              default = { };
-              description = "OpenSpec config overrides";
-            };
           };
         };
         default = { };
-        description = "OpenSpec configuration for this workspace";
+        description = "OpenSpec configuration for this project";
       };
     };
   };
 
-  # Collect all agent-deck profile names to check for duplicates
-  agentDeckProfiles = lib.filter (p: p != null)
-    (lib.mapAttrsToList (_: ws: ws.agentDeck.profile) cfg.workspaces);
+  # Project names are used as profile names
+  projectNames = lib.attrNames cfg.projects;
 
-  # Collect all schema lists from all workspaces (union)
-  allSchemas = lib.unique (lib.concatMap (ws: ws.openspec.schemas)
-    (lib.attrValues cfg.workspaces));
+  # Collect all schema lists from all projects (union)
+  allSchemas = lib.unique (lib.concatMap (proj: proj.openspec.schemas)
+    (lib.attrValues cfg.projects));
 
-  # Generate config.yaml content
-  configContent = let
-    workspaceEntries = lib.mapAttrs (name: ws: {
-      path = ws.path;
-      workflows = ws.workflows;
-    } // lib.optionalAttrs (ws.agentDeck.profile != null) {
-      agentDeckProfile = ws.agentDeck.profile;
-    } // lib.optionalAttrs (ws.claudeCode.model != null) {
-      claudeCodeProfile = name;
-    }) cfg.workspaces;
-  in
-    builtins.toJSON { workspaces = workspaceEntries; };
+  # Generate YAML config content with engine-own state only
+  yamlFormat = pkgs.formats.yaml { };
+  configData = {
+    projects = lib.mapAttrs (name: proj:
+      { inherit (proj) path workflows; agent_deck_profile = name; }
+      // lib.optionalAttrs (proj.openspec.schemas_path != null) {
+        openspec = { inherit (proj.openspec) schemas_path; };
+      }
+    ) cfg.projects;
+  };
+
 in
 {
   meta.maintainers = [ ];
@@ -95,75 +68,45 @@ in
   options.programs.codecorral = {
     enable = lib.mkEnableOption "CodeCorral workflow engine";
 
-    workspaces = lib.mkOption {
-      type = lib.types.attrsOf workspaceType;
+    projects = lib.mkOption {
+      type = lib.types.attrsOf projectType;
       default = { };
-      description = "Workspace configurations for CodeCorral";
+      description = "Project configurations for CodeCorral. Each project can declare claude-code settings (passed through to agentplot-kit profiles) and openspec schemas.";
     };
   };
 
   config = lib.mkIf cfg.enable {
-    # Assert no duplicate agent-deck profile names
+    # Assert no duplicate profile names (project names are profile names)
     assertions = [
       {
-        assertion = (lib.length agentDeckProfiles) == (lib.length (lib.unique agentDeckProfiles));
-        message = "Duplicate agentDeck profile names across CodeCorral workspaces: ${builtins.toJSON agentDeckProfiles}";
+        assertion = (lib.length projectNames) == (lib.length (lib.unique projectNames));
+        message = "Duplicate profile names across CodeCorral projects: ${builtins.toJSON projectNames}";
       }
     ];
 
-    # Generate ~/.codecorral/config.yaml
-    home.file.".codecorral/config.yaml".text =
-      let
-        yamlWorkspaces = lib.mapAttrs (name: ws:
-          { inherit (ws) path workflows; }
-          // lib.optionalAttrs (ws.agentDeck.profile != null) {
-            agentDeckProfile = ws.agentDeck.profile;
-          }
-          // lib.optionalAttrs (ws.claudeCode.model != null) {
-            claudeCodeProfile = name;
-          }
-        ) cfg.workspaces;
-      in
-        ''
-          # Generated by CodeCorral Home Manager module — do not edit manually.
-          # Project-level overrides go in .codecorral/config.yaml within each project.
-          ${builtins.toJSON { workspaces = yamlWorkspaces; }}
-        '';
+    # Generate ~/.codecorral/config.yaml with engine-own state only
+    home.file.".codecorral/config.yaml".source =
+      yamlFormat.generate "codecorral-config.yaml" configData;
 
-    # Delegate to upstream agent-deck module if available
-    programs.agent-deck = lib.mkIf (config ? programs && config.programs ? agent-deck) (
-      let
-        profileConfigs = lib.filterAttrs (_: v: v != null)
-          (lib.mapAttrs (_: ws: ws.agentDeck.profile) cfg.workspaces);
-      in
-      {
-        profiles = lib.mapAttrs' (_: profileName: {
-          name = profileName;
-          value = {
-            claude.configDir = ".claude-${profileName}";
-          };
-        }) profileConfigs;
-      }
-    );
+    # Delegate per-project agent-deck profile (claude.config_dir convention only)
+    programs.agent-deck = lib.mkIf (lib.hasAttrByPath [ "programs" "agent-deck" ] config) {
+      profiles = lib.mapAttrs (name: _proj: {
+        claude.configDir = lib.mkDefault ".claude-${name}";
+      }) cfg.projects;
+    };
 
-    # Delegate to upstream claude-code module if available
-    programs.claude-code = lib.mkIf (config ? programs && config.programs ? claude-code) (
-      let
-        claudeConfigs = lib.filterAttrs (_: ws: ws.claudeCode.model != null)
-          cfg.workspaces;
-      in
-      {
-        profiles = lib.mapAttrs (name: ws: {
-          configDir = ".claude-${name}";
-          settings = lib.optionalAttrs (ws.claudeCode.model != null) {
-            model = ws.claudeCode.model;
-          };
-        }) claudeConfigs;
-      }
-    );
+    # Delegate per-project claude-code settings (full pass-through via agentplot-kit)
+    programs.claude-code = lib.mkIf (lib.hasAttrByPath [ "programs" "claude-code" "profiles" ] config) {
+      profiles = lib.mapAttrs (name: proj:
+        lib.mkMerge [
+          { configDir = lib.mkDefault ".claude-${name}"; }
+          proj.claude_code
+        ]
+      ) (lib.filterAttrs (_: proj: proj.claude_code != { }) cfg.projects);
+    };
 
-    # Delegate to upstream openspec module if available
-    programs.openspec = lib.mkIf (config ? programs && config.programs ? openspec) {
+    # Delegate openspec schemas (union across all projects)
+    programs.openspec = lib.mkIf (lib.hasAttrByPath [ "programs" "openspec" ] config) {
       enable = true;
       schemas = allSchemas;
     };

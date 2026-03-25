@@ -10,10 +10,10 @@
 
 ## 2. Redesign Home Manager module
 
-- [ ] 2.1 Rename `workspaceType` → `projectType` and `programs.codecorral.workspaces` → `programs.codecorral.projects`. Use snake_case option names throughout.
-- [ ] 2.2 Replace the entire typed `workspaceType` submodule (current lines 6-69) with new `projectType`: `path` (string), `workflows` (list of strings), `claude_code` (`attrsOf anything`, default `{}`), `openspec` (typed submodule with `schemas` list and `schemas_path` nullable string). Remove `agentDeck`, `claudeCode` typed submodules.
-- [ ] 2.3 Implement per-project agent-deck profile: for each project, set `programs.agent-deck.profiles.${name}.claude.config_dir = lib.mkDefault ".claude-${name}"`. Guard with `lib.mkIf (lib.hasAttrByPath ["programs" "agent-deck"] config)`.
-- [ ] 2.4 Implement per-project claude-code delegation using `lib.mkMerge`:
+- [x] 2.1 Rename `workspaceType` → `projectType` and `programs.codecorral.workspaces` → `programs.codecorral.projects`. Use snake_case option names throughout.
+- [x] 2.2 Replace the entire typed `workspaceType` submodule (current lines 6-69) with new `projectType`: `path` (string), `workflows` (list of strings), `claude_code` (`attrsOf anything`, default `{}`), `openspec` (typed submodule with `schemas` list and `schemas_path` nullable string). Remove `agentDeck`, `claudeCode` typed submodules.
+- [x] 2.3 Implement per-project agent-deck profile: for each project, set `programs.agent-deck.profiles.${name}.claude.config_dir = lib.mkDefault ".claude-${name}"`. Guard with `lib.mkIf (lib.hasAttrByPath ["programs" "agent-deck"] config)`.
+- [x] 2.4 Implement per-project claude-code delegation using `lib.mkMerge`:
   ```nix
   programs.claude-code.profiles.${name} = lib.mkMerge [
     { config_dir = lib.mkDefault ".claude-${name}"; }
@@ -21,17 +21,17 @@
   ];
   ```
   Guard with `lib.mkIf (lib.hasAttrByPath ["programs" "claude-code" "profiles"] config)` — skip with warning if agentplot-kit profiles not available.
-- [ ] 2.5 Implement openspec delegation: collect union of all `project.openspec.schemas` and set `programs.openspec.schemas`. Guard with `lib.hasAttrByPath`.
-- [ ] 2.6 Generate `config.yaml` with engine-own state only: for each project, write `path`, `workflows`, `agent_deck_profile = <project_name>`, and `openspec.schemas_path` (if set). No tool-specific config in the YAML.
-- [ ] 2.7 Replace `builtins.toJSON` with YAML generation. Try `lib.generators.toYAML {}` first (pure Nix, no build dependency). Fall back to `pkgs.formats.yaml {}` if needed (note: pulls in Python/remarshal closure).
-- [ ] 2.8 Update duplicate profile assertion message from "workspaces" to "projects".
-- [ ] 2.9 Guard all upstream delegation with `lib.hasAttrByPath` checks (skip without error if upstream not imported).
+- [x] 2.5 Implement openspec delegation: collect union of all `project.openspec.schemas` and set `programs.openspec.schemas`. Guard with `lib.hasAttrByPath`.
+- [x] 2.6 Generate `config.yaml` with engine-own state only: for each project, write `path`, `workflows`, `agent_deck_profile = <project_name>`, and `openspec.schemas_path` (if set). No tool-specific config in the YAML.
+- [x] 2.7 Replace `builtins.toJSON` with YAML generation. Try `lib.generators.toYAML {}` first (pure Nix, no build dependency). Fall back to `pkgs.formats.yaml {}` if needed (note: pulls in Python/remarshal closure).
+- [x] 2.8 Update duplicate profile assertion message from "workspaces" to "projects".
+- [x] 2.9 Guard all upstream delegation with `lib.hasAttrByPath` checks (skip without error if upstream not imported).
 
 ## 3. Fix Nix package build
 
-- [ ] 3.1 Fix `packages.codecorral` in `flake.nix`: try `bun2nix` (`mkBunDerivation`) first, fall back to `pkgs.stdenv.mkDerivation` with `pkgs.bun` in `nativeBuildInputs`. Replace empty `npmDepsHash` and `npx tsc`. Document Bun-in-Nix caveats (sandbox compile bug bun#24645, AVX/macOS). Fall back to Node.js build if Bun sandbox issues arise.
-- [ ] 3.2 Verify `nix build .#codecorral` completes without errors.
-- [ ] 3.3 Update `checks` in `flake.nix` for renamed module.
+- [x] 3.1 Fix `packages.codecorral` in `flake.nix`: try `bun2nix` (`mkBunDerivation`) first, fall back to `pkgs.stdenv.mkDerivation` with `pkgs.bun` in `nativeBuildInputs`. Replace empty `npmDepsHash` and `npx tsc`. Document Bun-in-Nix caveats (sandbox compile bug bun#24645, AVX/macOS). Fall back to Node.js build if Bun sandbox issues arise.
+- [x] 3.2 Verify `nix build .#codecorral` completes without errors.
+- [x] 3.3 Update `checks` in `flake.nix` for renamed module.
 
 ## 4. Update specs and documentation
 

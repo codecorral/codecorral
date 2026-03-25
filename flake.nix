@@ -17,23 +17,33 @@
           cp -r ${./openspec/schemas}/* $out/share/openspec/schemas/
         '';
 
-        packages.codecorral = pkgs.buildNpmPackage {
+        # Build the codecorral CLI using Bun for TypeScript compilation.
+        # Falls back to a simple stdenv derivation since there is no
+        # buildBunPackage in nixpkgs yet (nixpkgs#255890).
+        # Known caveats: Bun.build() compile mode may produce 0-byte binaries
+        # in Nix sandbox (oven-sh/bun#24645); AVX issues on macOS/Rosetta.
+        packages.codecorral = pkgs.stdenv.mkDerivation {
           pname = "codecorral";
           version = "0.1.0";
           src = ./.;
-          npmDepsHash = "";
-          dontNpmBuild = true;
+
+          nativeBuildInputs = [ pkgs.bun pkgs.nodejs ];
+
           buildPhase = ''
-            npx tsc
+            export HOME=$TMPDIR
+            bun install --frozen-lockfile
+            bun run build
           '';
+
           installPhase = ''
             mkdir -p $out/bin $out/lib/codecorral
             cp -r dist/* $out/lib/codecorral/
             cp -r node_modules $out/lib/codecorral/
-            cat > $out/bin/codecorral <<EOF
+
+            cat > $out/bin/codecorral <<WRAPPER
             #!/usr/bin/env node
             require('$out/lib/codecorral/cli/index.js');
-            EOF
+            WRAPPER
             chmod +x $out/bin/codecorral
           '';
         };
