@@ -58,7 +58,16 @@
         };
       }
     ) // {
-      homeManagerModules.openspec = import ./nix/hm-module.nix self;
-      homeManagerModules.codecorral = import ./nix/codecorral-hm-module.nix;
+      homeManagerModules.codecorral = import ./nix/codecorral-hm-module.nix self;
+
+      # Backwards-compatible alias — programs.openspec forwards to programs.codecorral
+      homeManagerModules.openspec = { lib, ... }: {
+        imports = [
+          (import ./nix/codecorral-hm-module.nix self)
+          (lib.mkRenamedOptionModule [ "programs" "openspec" "enable" ] [ "programs" "codecorral" "enable" ])
+          (lib.mkRenamedOptionModule [ "programs" "openspec" "schemas" ] [ "programs" "codecorral" "schemas" ])
+          (lib.mkRenamedOptionModule [ "programs" "openspec" "schemaPackage" ] [ "programs" "codecorral" "schema_package" ])
+        ];
+      };
     };
 }

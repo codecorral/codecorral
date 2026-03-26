@@ -33,7 +33,6 @@ export interface ProjectConfig {
   path: string;
   workflows?: string[];
   agent_deck_profile?: string;
-  openspec_schemas_path?: string;
 }
 
 export interface CodeCorralConfig {
