@@ -55,10 +55,12 @@ codecorral/
     schemas/         # JSON schemas (e.g. dev.codecorral.intent)
     specs/           # Main specifications
     config.yaml      # OpenSpec configuration
+  decks/
+    codecorral.deck.yaml       # 6-group AI-DLC session layout for shuffle
+    conductors/                # Default conductor instruction files
   nix/
-    hm-module.nix              # Home Manager module for schema distribution
-    codecorral-hm-module.nix   # Home Manager module for project configuration
-  flake.nix                    # Nix flake — builds, distributes schemas & projects
+    codecorral-hm-module.nix   # Unified HM module (schemas, projects, deck activation)
+  flake.nix                    # Nix flake — builds, distributes schemas, decks & projects
 ```
 
 ## Commands
@@ -81,11 +83,23 @@ nix flake check                # Validate flake
 
 ### OpenSpec Schemas via Home Manager (Nix)
 
-This flake distributes custom OpenSpec schemas (e.g., `intent`) to your system using Home Manager's `xdg.dataFile`. Once installed, schemas are available globally at `~/.local/share/openspec/schemas/` without needing to copy them into each project.
+Schema distribution is now part of the unified `programs.codecorral` module. The legacy `programs.openspec` namespace still works but emits deprecation warnings — migrate to `programs.codecorral.schemas`.
 
-#### 1. Add the flake input
+```nix
+# Old (deprecated, still works):
+programs.openspec.enable = true;
+programs.openspec.schemas = [ "dev.codecorral.intent@2026-03-11.0" ];
 
-In your `flake.nix` (the one that drives your Home Manager config), add `codecorral` as an input:
+# New (recommended):
+programs.codecorral.enable = true;
+programs.codecorral.schemas = [ "dev.codecorral.intent@2026-03-11.0" ];
+```
+
+Schemas are installed globally to `~/.local/share/openspec/schemas/` via `xdg.dataFile`. Empty list means all available schemas are installed.
+
+#### Setup
+
+In your `flake.nix`:
 
 ```nix
 {
@@ -94,37 +108,15 @@ In your `flake.nix` (the one that drives your Home Manager config), add `codecor
     home-manager.url = "github:nix-community/home-manager";
     codecorral.url = "github:codecorral/codecorral";
   };
-
-  # ... rest of your flake
 }
 ```
 
-#### 2. Import the Home Manager module
-
-Pass the module to your Home Manager configuration. How you do this depends on your setup, but typically:
+Import the module:
 
 ```nix
-# In your home-manager config (e.g., home.nix or flake.nix outputs)
 home-manager.users.yourname = {
-  imports = [
-    codecorral.homeManagerModules.openspec
-  ];
+  imports = [ codecorral.homeManagerModules.codecorral ];
 };
-```
-
-#### 3. Enable the module
-
-In your Home Manager config:
-
-```nix
-{
-  programs.openspec = {
-    enable = true;
-
-    # Optional: install only specific schemas (default: all)
-    # schemas = [ "dev.codecorral.intent@2026-03-11.0" ];
-  };
-}
 ```
 
 #### 4. Apply
@@ -200,8 +192,11 @@ home-manager.users.yourname = {
         rules = [ "Always use conventional commits" ];
       };
 
-      # Schemas collected as union across all projects
-      openspec.schemas = [ "dev.codecorral.intent@2026-03-11.0" ];
+      # Override conductor instructions per project (optional)
+      conductors.foreman = {
+        claude_md = ./my-foreman.md;   # null = use bundled default
+        # policy_md = ./my-policy.md;  # null = use bundled default
+      };
     };
   };
 
@@ -225,6 +220,10 @@ To override:
 ```nix
 programs.codecorral.projects.my-project.claude_code.configDir = ".claude-custom";
 ```
+
+#### Automatic session layout
+
+On `home-manager switch`, the module automatically runs `shuffle deal` for each project, provisioning the 6-group AI-DLC session layout (clint, exploration, backlogs, elaboration, construction, operations) in agent-deck. This is idempotent and additive — existing sessions are never deleted. If shuffle or agent-deck is unavailable, the activation logs a warning and continues.
 
 #### What goes in `config.yaml`
 

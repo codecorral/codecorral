@@ -48,10 +48,12 @@ codecorral/
     schemas/         # JSON schemas (e.g. dev.codecorral.intent)
     specs/           # Main specifications
     config.yaml      # OpenSpec configuration
+  decks/
+    codecorral.deck.yaml       # 6-group AI-DLC session layout for shuffle
+    conductors/                # Default conductor instruction files
   nix/
-    hm-module.nix              # Home Manager module for schema distribution
-    codecorral-hm-module.nix   # Home Manager module for project configuration
-  flake.nix                    # Nix flake — builds, distributes schemas & projects
+    codecorral-hm-module.nix   # Unified HM module (schemas, projects, deck activation)
+  flake.nix                    # Nix flake — builds, distributes schemas, decks & projects
 ```
 
 ## Development Guidelines

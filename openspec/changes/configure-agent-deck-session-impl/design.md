@@ -52,9 +52,11 @@ The current `projectType` has an `openspec` submodule with `schemas` and `schema
 - `openspec_schemas_path` from TypeScript `ProjectConfig` type
 - Per-project openspec delegation block
 
-### D3: Deck YAML authoring
+### D3: Deck YAML authoring with overridable conductor policy
 
-Create `decks/codecorral.deck.yaml` defining the standard 6-group AI-DLC session layout:
+Create `decks/codecorral.deck.yaml` defining the standard 6-group AI-DLC session layout. The deck YAML is a **template** — the `claude_md` path for the foreman conductor is resolved at activation time, allowing per-project overrides.
+
+Ship a default conductor policy at `decks/conductors/foreman.md`. This is the fallback — users can override it per-project via the `conductor_policy` option in the project type.
 
 ```yaml
 name: codecorral
@@ -77,9 +79,33 @@ groups:
     sessions: {}
 ```
 
-Groups start minimal — sessions within groups are created dynamically by the conductor at runtime, not pre-defined in the deck. The deck establishes the group structure and the foreman conductor. Empty groups are valid in shuffle.
+Groups start minimal — sessions are created dynamically by the conductor at runtime. The deck establishes the group structure and the foreman conductor. Empty groups are valid in shuffle.
 
-Conductor `.md` files live in `decks/conductors/`. The deck YAML references them via relative paths — shuffle resolves these from the deck file's directory (shuffle#4).
+### D3a: Per-project conductor overrides
+
+Shuffle's `Conductor` type has two file fields: `claude_md` (agent instructions/system prompt) and `policy_md` (approval/routing rules). Both support file paths resolved relative to the deck YAML. Users should be able to override either per-project, per-conductor.
+
+Add `conductors` to the project type:
+
+```nix
+programs.codecorral.projects.my-project = {
+  path = "...";
+  conductors.foreman = {
+    claude_md = ./my-foreman-instructions.md;  # null = use default
+    policy_md = ./my-foreman-policy.md;        # null = use default
+  };
+  # Structure supports multiple conductors from the start
+};
+```
+
+Type: `attrsOf (submodule { claude_md = nullOr path; policy_md = nullOr path; })`, default `{}`.
+
+The activation builds a per-project deck derivation that:
+1. Copies the base deck YAML and default conductor files
+2. For each conductor override, copies the user's file into the derivation and patches the deck YAML to point at it
+3. Shuffle deal runs against the per-project deck
+
+If no conductor overrides are set, the bundled default deck is used directly (no per-project derivation needed).
 
 ### D4: Shuffle flake input and deck derivation
 

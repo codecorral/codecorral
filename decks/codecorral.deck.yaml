@@ -1,0 +1,19 @@
+name: codecorral
+
+groups:
+  clint:
+    conductors:
+      foreman:
+        description: "Primary conductor — polls task board, delegates work, routes approvals"
+        heartbeat: true
+        claude_md: ./conductors/foreman.md
+  exploration:
+    sessions: {}
+  backlogs:
+    sessions: {}
+  elaboration:
+    sessions: {}
+  construction:
+    sessions: {}
+  operations:
+    sessions: {}

@@ -4,9 +4,10 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
     flake-utils.url = "github:numtide/flake-utils";
+    shuffle.url = "github:codecorral/shuffle";
   };
 
-  outputs = { self, nixpkgs, flake-utils }:
+  outputs = { self, nixpkgs, flake-utils, shuffle }:
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
@@ -15,6 +16,11 @@
         packages.openspec-schemas = pkgs.runCommand "openspec-schemas" { } ''
           mkdir -p $out/share/openspec/schemas
           cp -r ${./openspec/schemas}/* $out/share/openspec/schemas/
+        '';
+
+        packages.codecorral-deck = pkgs.runCommand "codecorral-deck" { } ''
+          mkdir -p $out
+          cp -r ${./decks}/* $out/
         '';
 
         # Build the codecorral CLI using Bun for TypeScript compilation.
