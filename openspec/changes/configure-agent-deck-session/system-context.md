@@ -87,16 +87,15 @@ Before (current state after fix-project-config):
 
 After (this intent):
   programs.codecorral.enable = true
-  programs.codecorral.schemas = { ... }                        # migrated from programs.openspec
+  programs.codecorral.schemas = [ ... ]                        # migrated from programs.openspec (global)
   programs.codecorral.projects.<name>.claude_code = { ... }    # unchanged
-  programs.codecorral.projects.<name>.openspec.schemas = [...]  # unchanged
-  programs.codecorral.<decks TBD — namespace needs exploration>
   programs.agent-deck.enable = true                            # unchanged
+  # Deck activation is automatic — no user-facing option.
+  # HM activation runs shuffle deal for each project using the bundled deck YAML.
 ```
 
-NOTE: The exact namespace for deck profile configuration needs exploration. Options
-include `programs.codecorral.profiles.<name>.decks`, `programs.codecorral.decks.<name>`,
-or integrating with `programs.codecorral.projects.<name>`. See exploration notes.
+Per-project `openspec.schemas` removed — schemas are global, not per-project. Deck layout is
+fixed and applied automatically behind the scenes (not user-configurable).
 
 This is a breaking change for existing users of `programs.openspec`. Migration uses `mkRenamedOptionModule` to provide deprecation warnings and automatic option forwarding during a transition period.
 

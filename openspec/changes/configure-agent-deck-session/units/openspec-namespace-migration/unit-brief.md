@@ -23,12 +23,16 @@
 ## Scope Boundaries
 
 **In scope:**
-- Add `programs.codecorral.schemas` sub-option (enable, schemas list, schemaPackage) to `codecorral-hm-module.nix`
+- Add `programs.codecorral.schemas` sub-option (enable, schemas list, schemaPackage) to `codecorral-hm-module.nix` — this is a global option, not per-project
+- Remove `openspec` from the `projectType` submodule (per-project `openspec.schemas` and `openspec.schemas_path` are premature — schemas are global)
+- Remove the per-project openspec schema union logic from the HM module
 - Add `mkRenamedOptionModule` for `programs.openspec` → `programs.codecorral.schemas`
 - Keep `homeManagerModules.openspec` export in `flake.nix` as an alias that imports the renamed module
 - Update README with migration guidance
+- Update `ProjectConfig` TypeScript type to remove `openspec_schemas_path` field
 
 **Out of scope:**
 - Removing `homeManagerModules.openspec` entirely (keep for backwards compat)
 - Changing how schemas are installed (XDG dataFile mechanism stays the same)
-- Deck profiles (separate unit)
+- Deck activation (separate unit)
+- Per-project schema configuration (deferred until use cases are clear)
